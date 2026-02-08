@@ -1,0 +1,1562 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eval Dataset Manager</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <style>
+    [v-cloak] { display: none; }
+    .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
+    .fade-enter-from, .fade-leave-to { opacity: 0; }
+    .slide-enter-active, .slide-leave-active { transition: transform 0.3s ease; }
+    .slide-enter-from { transform: translateX(100%); }
+    .slide-leave-to { transform: translateX(100%); }
+    .modal-mask { background: rgba(0,0,0,0.5); }
+    .truncate-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .truncate-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+    .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+    input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
+    .tag-badge { font-size: 11px; padding: 1px 8px; border-radius: 9999px; }
+    .media-placeholder {
+      background: repeating-conic-gradient(#f1f5f9 0% 25%, #e2e8f0 0% 50%) 50% / 16px 16px;
+    }
+  </style>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',300:'#93c5fd',400:'#60a5fa',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8' },
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-gray-50 text-gray-900 h-screen overflow-hidden">
+<div id="app" v-cloak class="h-full flex flex-col">
+
+  <!-- ==================== HEADER ==================== -->
+  <header class="bg-white border-b border-gray-200 px-4 h-14 flex items-center justify-between flex-shrink-0 z-30">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      </div>
+      <h1 class="text-lg font-semibold text-gray-800">Eval Dataset Manager</h1>
+    </div>
+    <div class="flex items-center gap-2">
+      <!-- Search -->
+      <div class="relative">
+        <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input v-model="searchQuery" type="text" placeholder="搜索任务..." class="pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-lg w-56 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+      </div>
+      <!-- Import -->
+      <button @click="showImportModal=true" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        导入
+      </button>
+      <!-- Export CSV -->
+      <button @click="showExportModal=true" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1.5">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l4 4m0 0l4-4m-4 4V4"/></svg>
+        导出
+      </button>
+    </div>
+  </header>
+
+  <div class="flex flex-1 overflow-hidden">
+    <!-- ==================== SIDEBAR ==================== -->
+    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col flex-shrink-0">
+      <!-- Dataset List -->
+      <div class="p-3 border-b border-gray-100">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">数据集</span>
+          <button @click="openCreateDataset" class="text-primary-600 hover:text-primary-700 p-0.5 rounded hover:bg-primary-50" title="新建数据集">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg>
+          </button>
+        </div>
+        <div class="space-y-0.5 max-h-60 overflow-y-auto scrollbar-thin">
+          <div v-if="datasets.length===0" class="text-xs text-gray-400 py-4 text-center">暂无数据集，点击 + 新建</div>
+          <div v-for="ds in datasets" :key="ds.id"
+               @click="selectDataset(ds.id)"
+               :class="['px-2.5 py-2 rounded-lg cursor-pointer text-sm flex items-center justify-between group',
+                         activeDatasetId===ds.id ? 'bg-primary-50 text-primary-700 font-medium' : 'hover:bg-gray-50 text-gray-700']">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="flex-shrink-0 w-2 h-2 rounded-full" :class="taskTypeColor(ds.taskType)"></span>
+              <span class="truncate">{{ ds.name }}</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <span class="text-xs text-gray-400">{{ ds.tasks.length }}</span>
+              <button @click.stop="editDataset(ds)" class="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-200" title="编辑">
+                <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Statistics -->
+      <div class="p-3 border-b border-gray-100" v-if="activeDataset">
+        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">统计</span>
+        <div class="mt-2 space-y-1.5">
+          <div class="flex justify-between text-xs">
+            <span class="text-gray-500">总任务数</span>
+            <span class="font-medium">{{ activeDataset.tasks.length }}</span>
+          </div>
+          <div class="flex justify-between text-xs">
+            <span class="text-gray-500">任务类型</span>
+            <span class="font-medium">{{ TASK_TYPE_LABELS[activeDataset.taskType] }}</span>
+          </div>
+          <div class="flex flex-wrap gap-1 mt-1">
+            <span v-for="(count, diff) in difficultyStats" :key="diff"
+                  :class="['tag-badge', difficultyColor(diff)]">
+              {{ DIFFICULTY_LABELS[diff] }} {{ count }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter Panel -->
+      <div class="p-3 flex-1 overflow-y-auto scrollbar-thin" v-if="activeDataset">
+        <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">筛选</span>
+
+        <!-- Difficulty Filter -->
+        <div class="mt-2">
+          <div class="text-xs text-gray-500 mb-1">难度</div>
+          <div class="flex flex-wrap gap-1">
+            <button v-for="d in ['low','medium','high']" :key="d"
+                    @click="toggleFilter('difficulty', d)"
+                    :class="['tag-badge cursor-pointer border', filters.difficulty.includes(d) ? difficultyColorActive(d) : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300']">
+              {{ DIFFICULTY_LABELS[d] }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Style Filter -->
+        <div class="mt-3">
+          <div class="text-xs text-gray-500 mb-1">风格</div>
+          <div class="flex flex-wrap gap-1">
+            <button v-for="s in STYLE_OPTIONS" :key="s.id"
+                    @click="toggleFilter('style', s.id)"
+                    :class="['tag-badge cursor-pointer border', filters.style.includes(s.id) ? 'bg-primary-100 text-primary-700 border-primary-300' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300']">
+              {{ s.zh }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Capability Filter -->
+        <div class="mt-3">
+          <div class="text-xs text-gray-500 mb-1">能力维度</div>
+          <div class="flex flex-wrap gap-1">
+            <button v-for="c in CAPABILITY_OPTIONS" :key="c.id"
+                    @click="toggleFilter('capability', c.id)"
+                    :class="['tag-badge cursor-pointer border', filters.capability.includes(c.id) ? 'bg-violet-100 text-violet-700 border-violet-300' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300']">
+              {{ c.zh }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Scene Type Filter -->
+        <div class="mt-3">
+          <div class="text-xs text-gray-500 mb-1">场景</div>
+          <div class="flex flex-wrap gap-1">
+            <button v-for="sc in SCENE_OPTIONS" :key="sc.id"
+                    @click="toggleFilter('scene', sc.id)"
+                    :class="['tag-badge cursor-pointer border', filters.scene.includes(sc.id) ? 'bg-emerald-100 text-emerald-700 border-emerald-300' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300']">
+              {{ sc.zh }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Custom Tags Filter -->
+        <div class="mt-3" v-if="allCustomTags.length">
+          <div class="text-xs text-gray-500 mb-1">自定义标签</div>
+          <div class="flex flex-wrap gap-1">
+            <button v-for="t in allCustomTags" :key="t"
+                    @click="toggleFilter('customTag', t)"
+                    :class="['tag-badge cursor-pointer border', filters.customTag.includes(t) ? 'bg-amber-100 text-amber-700 border-amber-300' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300']">
+              {{ t }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Clear Filters -->
+        <button v-if="hasActiveFilters" @click="clearFilters" class="mt-3 text-xs text-primary-600 hover:text-primary-700">
+          清除所有筛选
+        </button>
+      </div>
+
+      <!-- Footer -->
+      <div class="p-3 border-t border-gray-100 text-xs text-gray-400">
+        <div class="flex justify-between">
+          <span>{{ lastSavedText }}</span>
+          <span>{{ storageSize }}</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ==================== MAIN CONTENT ==================== -->
+    <main class="flex-1 flex flex-col overflow-hidden">
+      <!-- Empty State -->
+      <div v-if="!activeDataset" class="flex-1 flex items-center justify-center">
+        <div class="text-center">
+          <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          <p class="text-gray-500 mb-2">选择或创建一个数据集开始</p>
+          <button @click="openCreateDataset" class="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700">
+            新建数据集
+          </button>
+        </div>
+      </div>
+
+      <!-- Dataset Content -->
+      <template v-if="activeDataset">
+        <!-- Toolbar -->
+        <div class="px-4 py-2.5 bg-white border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+          <div class="flex items-center gap-3">
+            <h2 class="font-semibold text-gray-800">{{ activeDataset.name }}</h2>
+            <span class="text-xs text-gray-400" v-if="filteredTasks.length !== activeDataset.tasks.length">
+              {{ filteredTasks.length }} / {{ activeDataset.tasks.length }} 条
+            </span>
+            <span class="text-xs text-gray-400" v-else>
+              {{ activeDataset.tasks.length }} 条任务
+            </span>
+          </div>
+          <div class="flex items-center gap-2">
+            <!-- Sort -->
+            <select v-model="sortBy" class="text-xs border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-500">
+              <option value="created_desc">创建时间 ↓</option>
+              <option value="created_asc">创建时间 ↑</option>
+              <option value="evalId">Eval ID</option>
+              <option value="difficulty">难度</option>
+            </select>
+            <!-- View Toggle -->
+            <div class="flex border border-gray-300 rounded-md">
+              <button @click="viewMode='grid'" :class="['px-2 py-1', viewMode==='grid' ? 'bg-gray-100 text-gray-700' : 'text-gray-400 hover:text-gray-600']">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+              </button>
+              <button @click="viewMode='list'" :class="['px-2 py-1', viewMode==='list' ? 'bg-gray-100 text-gray-700' : 'text-gray-400 hover:text-gray-600']">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+              </button>
+            </div>
+            <!-- Add Task -->
+            <button @click="openCreateTask" class="px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4"/></svg>
+              添加任务
+            </button>
+          </div>
+        </div>
+
+        <!-- Task Grid/List -->
+        <div class="flex-1 overflow-y-auto p-4 scrollbar-thin">
+          <div v-if="filteredTasks.length===0" class="flex items-center justify-center h-full">
+            <div class="text-center">
+              <p class="text-gray-400 text-sm">{{ hasActiveFilters ? '没有匹配的任务' : '暂无任务' }}</p>
+              <button v-if="!hasActiveFilters" @click="openCreateTask" class="mt-2 text-sm text-primary-600 hover:text-primary-700">添加第一个任务</button>
+            </div>
+          </div>
+
+          <!-- Grid View -->
+          <div v-if="viewMode==='grid' && filteredTasks.length" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            <div v-for="task in paginatedTasks" :key="task.id"
+                 @click="openTaskDetail(task)"
+                 class="bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow cursor-pointer overflow-hidden">
+              <!-- Media Thumbnail -->
+              <div class="h-36 bg-gray-100 relative overflow-hidden">
+                <img v-if="getTaskThumbnail(task)" :src="getTaskThumbnail(task)" class="w-full h-full object-cover" @error="$event.target.style.display='none'">
+                <div v-else class="w-full h-full media-placeholder flex items-center justify-center">
+                  <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z"/></svg>
+                </div>
+                <span class="absolute top-2 left-2 tag-badge bg-white/90 text-gray-600 shadow-sm">{{ task.evalId }}</span>
+              </div>
+              <!-- Info -->
+              <div class="p-3">
+                <p class="text-sm text-gray-700 truncate-2 mb-2">{{ getTaskPromptPreview(task) }}</p>
+                <div class="flex flex-wrap gap-1">
+                  <span :class="['tag-badge', difficultyColor(task.difficulty)]">{{ DIFFICULTY_LABELS[task.difficulty] }}</span>
+                  <span v-for="s in task.styleCategories.slice(0,2)" :key="s" class="tag-badge bg-blue-50 text-blue-600">{{ getStyleLabel(s) }}</span>
+                  <span v-if="task.customTags.length" class="tag-badge bg-amber-50 text-amber-600">+{{ task.customTags.length }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- List View -->
+          <div v-if="viewMode==='list' && filteredTasks.length" class="space-y-1">
+            <div v-for="task in paginatedTasks" :key="task.id"
+                 @click="openTaskDetail(task)"
+                 class="bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow cursor-pointer px-4 py-3 flex items-center gap-4">
+              <!-- Thumbnail -->
+              <div class="w-16 h-16 bg-gray-100 rounded-md flex-shrink-0 overflow-hidden">
+                <img v-if="getTaskThumbnail(task)" :src="getTaskThumbnail(task)" class="w-full h-full object-cover" @error="$event.target.style.display='none'">
+                <div v-else class="w-full h-full media-placeholder flex items-center justify-center">
+                  <svg class="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5"/></svg>
+                </div>
+              </div>
+              <!-- Info -->
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="text-sm font-medium text-gray-700">{{ task.evalId }}</span>
+                  <span :class="['tag-badge', difficultyColor(task.difficulty)]">{{ DIFFICULTY_LABELS[task.difficulty] }}</span>
+                </div>
+                <p class="text-xs text-gray-500 truncate">{{ getTaskPromptPreview(task) }}</p>
+              </div>
+              <!-- Tags -->
+              <div class="flex flex-wrap gap-1 flex-shrink-0 max-w-xs">
+                <span v-for="s in task.styleCategories.slice(0,2)" :key="s" class="tag-badge bg-blue-50 text-blue-600">{{ getStyleLabel(s) }}</span>
+                <span v-for="t in task.customTags.slice(0,2)" :key="t" class="tag-badge bg-amber-50 text-amber-600">{{ t }}</span>
+              </div>
+              <!-- Actions -->
+              <div class="flex gap-1 flex-shrink-0">
+                <button @click.stop="duplicateTask(task)" class="p-1.5 rounded hover:bg-gray-100" title="复制">
+                  <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                </button>
+                <button @click.stop="confirmDeleteTask(task)" class="p-1.5 rounded hover:bg-red-50" title="删除">
+                  <svg class="w-4 h-4 text-gray-400 hover:text-red-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pagination -->
+          <div v-if="totalPages > 1" class="flex justify-center items-center gap-2 mt-4 pb-4">
+            <button @click="currentPage = Math.max(1, currentPage-1)" :disabled="currentPage===1"
+                    class="px-3 py-1 text-sm border rounded-md disabled:opacity-40 hover:bg-gray-50">上一页</button>
+            <span class="text-sm text-gray-500">{{ currentPage }} / {{ totalPages }}</span>
+            <button @click="currentPage = Math.min(totalPages, currentPage+1)" :disabled="currentPage===totalPages"
+                    class="px-3 py-1 text-sm border rounded-md disabled:opacity-40 hover:bg-gray-50">下一页</button>
+          </div>
+        </div>
+      </template>
+    </main>
+  </div>
+
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- Dataset Create/Edit Modal -->
+  <div v-if="showDatasetModal" class="fixed inset-0 z-50 flex items-center justify-center modal-mask" @click.self="showDatasetModal=false">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
+      <div class="px-6 py-4 border-b border-gray-100">
+        <h3 class="font-semibold text-gray-800">{{ editingDataset ? '编辑数据集' : '新建数据集' }}</h3>
+      </div>
+      <div class="px-6 py-4 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">名称 *</label>
+          <input v-model="datasetForm.name" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="如: I2V 标准测试集 v1">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">描述</label>
+          <textarea v-model="datasetForm.description" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="数据集用途说明"></textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">任务类型 *</label>
+          <select v-model="datasetForm.taskType" :disabled="!!editingDataset" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100">
+            <option value="">请选择</option>
+            <option v-for="(label, key) in TASK_TYPE_LABELS" :key="key" :value="key">{{ label }}</option>
+          </select>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
+        <button @click="showDatasetModal=false" class="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
+        <button @click="saveDataset" :disabled="!datasetForm.name || !datasetForm.taskType" class="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-40">
+          {{ editingDataset ? '保存' : '创建' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Task Create/Edit Modal -->
+  <div v-if="showTaskModal" class="fixed inset-0 z-50 flex items-start justify-center modal-mask overflow-y-auto py-8" @click.self="showTaskModal=false">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4">
+      <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white rounded-t-xl z-10">
+        <h3 class="font-semibold text-gray-800">{{ editingTask ? '编辑任务' : '新建任务' }}</h3>
+        <button @click="showTaskModal=false" class="p-1 rounded hover:bg-gray-100">
+          <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="px-6 py-4 space-y-4">
+        <!-- Common Fields -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Eval ID *</label>
+            <input v-model="taskForm.evalId" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" :placeholder="suggestedEvalId">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">难度 *</label>
+            <select v-model="taskForm.difficulty" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+              <option value="low">低</option>
+              <option value="medium">中</option>
+              <option value="high">高</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Style Categories -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">风格分类</label>
+          <div class="flex flex-wrap gap-1.5">
+            <button v-for="s in STYLE_OPTIONS" :key="s.id"
+                    @click="toggleTaskStyle(s.id)"
+                    :class="['tag-badge cursor-pointer border', taskForm.styleCategories.includes(s.id) ? 'bg-primary-100 text-primary-700 border-primary-300' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300']">
+              {{ s.zh }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Capability Focus -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">能力维度</label>
+          <div class="flex flex-wrap gap-1.5">
+            <button v-for="c in CAPABILITY_OPTIONS" :key="c.id"
+                    @click="toggleTaskCapability(c.id)"
+                    :class="['tag-badge cursor-pointer border', taskForm.capabilityFocus.includes(c.id) ? 'bg-violet-100 text-violet-700 border-violet-300' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300']">
+              {{ c.zh }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Scene Type -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">场景类型</label>
+          <select v-model="taskForm.sceneType" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+            <option value="">未指定</option>
+            <option v-for="sc in SCENE_OPTIONS" :key="sc.id" :value="sc.id">{{ sc.zh }}</option>
+          </select>
+        </div>
+
+        <!-- Custom Tags -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">自定义标签</label>
+          <div class="flex flex-wrap gap-1.5 mb-2" v-if="taskForm.customTags.length">
+            <span v-for="(t,i) in taskForm.customTags" :key="i" class="tag-badge bg-amber-50 text-amber-600 flex items-center gap-1">
+              {{ t }}
+              <button @click="taskForm.customTags.splice(i,1)" class="hover:text-amber-800">&times;</button>
+            </span>
+          </div>
+          <div class="flex gap-2">
+            <input v-model="newCustomTag" @keydown.enter="addCustomTag" type="text" class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="输入标签后回车">
+            <button @click="addCustomTag" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">添加</button>
+          </div>
+        </div>
+
+        <hr class="border-gray-100">
+
+        <!-- Dynamic Task-Specific Parameters -->
+        <div>
+          <h4 class="text-sm font-semibold text-gray-700 mb-3">{{ TASK_TYPE_LABELS[activeDataset.taskType] }} 参数</h4>
+
+          <!-- T2I Parameters -->
+          <template v-if="activeDataset.taskType === 't2i'">
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">Prompt (EN)</label>
+                <textarea v-model="taskForm.params.promptEn" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">Prompt (ZH)</label>
+                <textarea v-model="taskForm.params.promptZh" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">Negative Prompt</label>
+                <input v-model="taskForm.params.negativePrompt" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+              </div>
+              <div class="grid grid-cols-4 gap-3">
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">Width</label>
+                  <input v-model.number="taskForm.params.width" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">Height</label>
+                  <input v-model.number="taskForm.params.height" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">Seed</label>
+                  <input v-model.number="taskForm.params.seed" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="-1">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">Steps</label>
+                  <input v-model.number="taskForm.params.steps" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="30">
+                </div>
+              </div>
+              <div class="grid grid-cols-3 gap-3">
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">CFG Scale</label>
+                  <input v-model.number="taskForm.params.cfgScale" type="number" step="0.5" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="7.5">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">Model</label>
+                  <input v-model="taskForm.params.model" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">Style</label>
+                  <input v-model="taskForm.params.style" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                </div>
+              </div>
+              <!-- Reference Images -->
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">参考图片 URL</label>
+                <div v-for="(img, i) in taskForm.params.referenceImages" :key="i" class="flex gap-2 mb-1">
+                  <input v-model="taskForm.params.referenceImages[i]" type="text" class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="URL 或本地路径">
+                  <button @click="taskForm.params.referenceImages.splice(i,1)" class="text-red-400 hover:text-red-600 text-sm">&times;</button>
+                </div>
+                <button @click="taskForm.params.referenceImages.push('')" class="text-xs text-primary-600 hover:text-primary-700">+ 添加图片</button>
+              </div>
+            </div>
+          </template>
+
+          <!-- T2V Parameters -->
+          <template v-if="activeDataset.taskType === 't2v'">
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">Prompt (EN)</label>
+                <textarea v-model="taskForm.params.promptEn" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">Prompt (ZH)</label>
+                <textarea v-model="taskForm.params.promptZh" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+              </div>
+              <div class="grid grid-cols-4 gap-3">
+                <div><label class="block text-xs text-gray-500 mb-1">Width</label><input v-model.number="taskForm.params.width" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></div>
+                <div><label class="block text-xs text-gray-500 mb-1">Height</label><input v-model.number="taskForm.params.height" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></div>
+                <div><label class="block text-xs text-gray-500 mb-1">时长 (s)</label><input v-model.number="taskForm.params.duration" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="5"></div>
+                <div><label class="block text-xs text-gray-500 mb-1">FPS</label><input v-model.number="taskForm.params.fps" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="24"></div>
+              </div>
+              <div class="grid grid-cols-3 gap-3">
+                <div><label class="block text-xs text-gray-500 mb-1">Seed</label><input v-model.number="taskForm.params.seed" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></div>
+                <div><label class="block text-xs text-gray-500 mb-1">Model</label><input v-model="taskForm.params.model" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></div>
+                <div><label class="block text-xs text-gray-500 mb-1">Motion Type</label><input v-model="taskForm.params.motionType" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></div>
+              </div>
+            </div>
+          </template>
+
+          <!-- I2V Parameters -->
+          <template v-if="activeDataset.taskType === 'i2v'">
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">首帧图片 (URL/路径) *</label>
+                <input v-model="taskForm.params.firstFrameUrl" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="https://... 或 /path/to/image.png">
+                <div v-if="taskForm.params.firstFrameUrl" class="mt-1 h-24 w-40 rounded overflow-hidden bg-gray-100">
+                  <img :src="taskForm.params.firstFrameUrl" class="w-full h-full object-cover" @error="$event.target.style.display='none'">
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">首帧 Prompt (EN)</label>
+                <textarea v-model="taskForm.params.firstFramePromptEn" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">首帧 Prompt (ZH)</label>
+                <textarea v-model="taskForm.params.firstFramePromptZh" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">尾帧图片 (URL/路径)</label>
+                <input v-model="taskForm.params.lastFrameUrl" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">尾帧 Prompt (EN)</label>
+                <textarea v-model="taskForm.params.lastFramePromptEn" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">尾帧 Prompt (ZH)</label>
+                <textarea v-model="taskForm.params.lastFramePromptZh" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">视频意图 (Initial Prompt) *</label>
+                <textarea v-model="taskForm.params.initialPrompt" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">中文意图描述 *</label>
+                <input v-model="taskForm.params.intentCn" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+              </div>
+              <div class="grid grid-cols-4 gap-3">
+                <div><label class="block text-xs text-gray-500 mb-1">Width</label><input v-model.number="taskForm.params.width" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="1920"></div>
+                <div><label class="block text-xs text-gray-500 mb-1">Height</label><input v-model.number="taskForm.params.height" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="1080"></div>
+                <div><label class="block text-xs text-gray-500 mb-1">时长 (s)</label><input v-model.number="taskForm.params.duration" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="5"></div>
+                <div><label class="block text-xs text-gray-500 mb-1">Seed</label><input v-model.number="taskForm.params.seed" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></div>
+              </div>
+              <div><label class="block text-xs text-gray-500 mb-1">Model</label><input v-model="taskForm.params.model" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></div>
+            </div>
+          </template>
+
+          <!-- I2I Parameters -->
+          <template v-if="activeDataset.taskType === 'i2i'">
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">输入图片 (URL/路径) *</label>
+                <input v-model="taskForm.params.inputImageUrl" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">Prompt (EN)</label>
+                <textarea v-model="taskForm.params.promptEn" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">Prompt (ZH)</label>
+                <textarea v-model="taskForm.params.promptZh" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">Negative Prompt</label>
+                <input v-model="taskForm.params.negativePrompt" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+              </div>
+              <div class="grid grid-cols-4 gap-3">
+                <div><label class="block text-xs text-gray-500 mb-1">Strength</label><input v-model.number="taskForm.params.strength" type="number" step="0.05" min="0" max="1" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="0.7"></div>
+                <div><label class="block text-xs text-gray-500 mb-1">Width</label><input v-model.number="taskForm.params.width" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></div>
+                <div><label class="block text-xs text-gray-500 mb-1">Height</label><input v-model.number="taskForm.params.height" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></div>
+                <div><label class="block text-xs text-gray-500 mb-1">Seed</label><input v-model.number="taskForm.params.seed" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></div>
+              </div>
+              <div><label class="block text-xs text-gray-500 mb-1">ControlNet Type</label><input v-model="taskForm.params.controlnetType" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="canny / depth / pose"></div>
+            </div>
+          </template>
+
+          <!-- Perler Beads Parameters -->
+          <template v-if="activeDataset.taskType === 'perler_beads'">
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">输入图片 (URL/路径) *</label>
+                <input v-model="taskForm.params.inputImageUrl" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">Prompt</label>
+                <textarea v-model="taskForm.params.promptEn" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+              </div>
+              <div class="grid grid-cols-3 gap-3">
+                <div><label class="block text-xs text-gray-500 mb-1">Palette</label><input v-model="taskForm.params.palette" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></div>
+                <div><label class="block text-xs text-gray-500 mb-1">Size</label><input v-model="taskForm.params.size" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></div>
+                <div><label class="block text-xs text-gray-500 mb-1">Style</label><input v-model="taskForm.params.style" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></div>
+              </div>
+            </div>
+          </template>
+
+          <!-- I2LoRA Parameters -->
+          <template v-if="activeDataset.taskType === 'i2lora'">
+            <div class="space-y-3">
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">风格描述 *</label>
+                <textarea v-model="taskForm.params.styleDescription" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">训练图片 URLs</label>
+                <div v-for="(img, i) in taskForm.params.trainingImages" :key="i" class="flex gap-2 mb-1">
+                  <input v-model="taskForm.params.trainingImages[i]" type="text" class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="URL 或本地路径">
+                  <button @click="taskForm.params.trainingImages.splice(i,1)" class="text-red-400 hover:text-red-600">&times;</button>
+                </div>
+                <button @click="taskForm.params.trainingImages.push('')" class="text-xs text-primary-600 hover:text-primary-700">+ 添加图片</button>
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">测试 Prompts</label>
+                <div v-for="(p, i) in taskForm.params.testPrompts" :key="i" class="flex gap-2 mb-1">
+                  <input v-model="taskForm.params.testPrompts[i]" type="text" class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                  <button @click="taskForm.params.testPrompts.splice(i,1)" class="text-red-400 hover:text-red-600">&times;</button>
+                </div>
+                <button @click="taskForm.params.testPrompts.push('')" class="text-xs text-primary-600 hover:text-primary-700">+ 添加 Prompt</button>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <hr class="border-gray-100">
+
+        <!-- Extension Metadata -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-sm font-medium text-gray-700">扩展字段 (metadata)</label>
+            <button @click="addMetadataField" class="text-xs text-primary-600 hover:text-primary-700">+ 添加字段</button>
+          </div>
+          <div v-for="(field, i) in taskForm.metadataFields" :key="i" class="flex gap-2 mb-1">
+            <input v-model="field.key" type="text" class="w-1/3 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="键">
+            <input v-model="field.value" type="text" class="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="值">
+            <button @click="taskForm.metadataFields.splice(i,1)" class="text-red-400 hover:text-red-600">&times;</button>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">备注</label>
+          <textarea v-model="taskForm.notes" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="可选备注信息"></textarea>
+        </div>
+      </div>
+
+      <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-2 sticky bottom-0 bg-white rounded-b-xl">
+        <button @click="showTaskModal=false" class="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
+        <button @click="saveTask" :disabled="!taskForm.evalId" class="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-40">
+          {{ editingTask ? '保存' : '创建' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Task Detail Modal -->
+  <div v-if="showDetailModal && detailTask" class="fixed inset-0 z-50 flex items-start justify-center modal-mask overflow-y-auto py-8" @click.self="showDetailModal=false">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-3xl mx-4">
+      <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+        <div class="flex items-center gap-3">
+          <h3 class="font-semibold text-gray-800">{{ detailTask.evalId }}</h3>
+          <span :class="['tag-badge', difficultyColor(detailTask.difficulty)]">{{ DIFFICULTY_LABELS[detailTask.difficulty] }}</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button @click="editTaskFromDetail" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">编辑</button>
+          <button @click="duplicateTask(detailTask); showDetailModal=false" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">复制</button>
+          <button @click="showDetailModal=false" class="p-1 rounded hover:bg-gray-100">
+            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="px-6 py-4">
+        <!-- Tags -->
+        <div class="flex flex-wrap gap-1.5 mb-4">
+          <span v-for="s in detailTask.styleCategories" :key="s" class="tag-badge bg-blue-50 text-blue-600">{{ getStyleLabel(s) }}</span>
+          <span v-for="c in detailTask.capabilityFocus" :key="c" class="tag-badge bg-violet-50 text-violet-600">{{ getCapabilityLabel(c) }}</span>
+          <span v-if="detailTask.sceneType" class="tag-badge bg-emerald-50 text-emerald-600">{{ getSceneLabel(detailTask.sceneType) }}</span>
+          <span v-for="t in detailTask.customTags" :key="t" class="tag-badge bg-amber-50 text-amber-600">{{ t }}</span>
+        </div>
+
+        <!-- Media Display -->
+        <div class="grid grid-cols-2 gap-4 mb-4" v-if="getDetailMediaList().length">
+          <div v-for="(m, i) in getDetailMediaList()" :key="i" class="bg-gray-100 rounded-lg overflow-hidden">
+            <div class="text-xs text-gray-500 px-2 py-1 bg-gray-50">{{ m.label }}</div>
+            <img v-if="m.url && !m.url.endsWith('.mp4')" :src="m.url" class="w-full max-h-64 object-contain" @error="$event.target.outerHTML='<div class=\'p-4 text-center text-xs text-gray-400\'>加载失败</div>'">
+            <video v-if="m.url && m.url.endsWith('.mp4')" :src="m.url" controls class="w-full max-h-64"></video>
+            <div v-if="!m.url" class="p-4 text-center text-xs text-gray-400">未设置</div>
+          </div>
+        </div>
+
+        <!-- Parameters -->
+        <div class="bg-gray-50 rounded-lg p-4 mb-4">
+          <h4 class="text-sm font-semibold text-gray-700 mb-2">参数</h4>
+          <div class="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+            <template v-for="(v, k) in getDetailParams()" :key="k">
+              <div class="flex">
+                <span class="text-gray-500 w-32 flex-shrink-0">{{ k }}</span>
+                <span class="text-gray-800 break-all" :class="{'whitespace-pre-wrap': typeof v === 'string' && v.length > 50}">{{ v }}</span>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Metadata -->
+        <div v-if="Object.keys(detailTask.metadata || {}).length" class="bg-gray-50 rounded-lg p-4 mb-4">
+          <h4 class="text-sm font-semibold text-gray-700 mb-2">扩展字段</h4>
+          <pre class="text-xs text-gray-600 overflow-x-auto">{{ JSON.stringify(detailTask.metadata, null, 2) }}</pre>
+        </div>
+
+        <!-- Notes -->
+        <div v-if="detailTask.notes" class="bg-amber-50 rounded-lg p-4 mb-4">
+          <h4 class="text-sm font-semibold text-gray-700 mb-1">备注</h4>
+          <p class="text-sm text-gray-600">{{ detailTask.notes }}</p>
+        </div>
+
+        <!-- Timestamps -->
+        <div class="text-xs text-gray-400 flex gap-4">
+          <span>创建: {{ formatDate(detailTask.createdAt) }}</span>
+          <span>更新: {{ formatDate(detailTask.updatedAt) }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import Modal -->
+  <div v-if="showImportModal" class="fixed inset-0 z-50 flex items-center justify-center modal-mask" @click.self="showImportModal=false">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4">
+      <div class="px-6 py-4 border-b border-gray-100">
+        <h3 class="font-semibold text-gray-800">导入数据</h3>
+      </div>
+      <div class="px-6 py-4 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">导入方式</label>
+          <div class="flex gap-2">
+            <button @click="importMode='file'" :class="['px-3 py-1.5 text-sm border rounded-lg', importMode==='file' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-300 hover:bg-gray-50']">上传文件</button>
+            <button @click="importMode='paste'" :class="['px-3 py-1.5 text-sm border rounded-lg', importMode==='paste' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-300 hover:bg-gray-50']">粘贴 JSON</button>
+          </div>
+        </div>
+        <div v-if="importMode==='file'">
+          <input type="file" accept=".json" @change="handleFileImport" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100">
+        </div>
+        <div v-if="importMode==='paste'">
+          <textarea v-model="importJsonText" rows="10" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder='粘贴 JSON 数据...'></textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">格式</label>
+          <select v-model="importFormat" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+            <option value="auto">自动检测</option>
+            <option value="platform">平台原生格式</option>
+            <option value="i2v_legacy">I2V 首尾帧格式 (legacy)</option>
+            <option value="i2lora_legacy">I2LoRA 风格格式 (legacy)</option>
+          </select>
+        </div>
+        <div v-if="importPreview" class="bg-gray-50 rounded-lg p-3">
+          <p class="text-sm text-gray-600">{{ importPreview }}</p>
+        </div>
+        <div v-if="importError" class="bg-red-50 text-red-600 text-sm rounded-lg p-3">{{ importError }}</div>
+      </div>
+      <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
+        <button @click="showImportModal=false" class="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
+        <button @click="executeImport" class="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">导入</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export Modal -->
+  <div v-if="showExportModal" class="fixed inset-0 z-50 flex items-center justify-center modal-mask" @click.self="showExportModal=false">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
+      <div class="px-6 py-4 border-b border-gray-100">
+        <h3 class="font-semibold text-gray-800">导出数据</h3>
+      </div>
+      <div class="px-6 py-4 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">导出格式</label>
+          <div class="flex gap-2">
+            <button @click="exportFormat='csv'" :class="['px-3 py-1.5 text-sm border rounded-lg', exportFormat==='csv' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-300 hover:bg-gray-50']">CSV (Batch Task)</button>
+            <button @click="exportFormat='json'" :class="['px-3 py-1.5 text-sm border rounded-lg', exportFormat==='json' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-300 hover:bg-gray-50']">JSON (备份)</button>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">导出范围</label>
+          <select v-model="exportScope" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+            <option value="current">当前数据集</option>
+            <option value="filtered">当前筛选结果</option>
+            <option value="all">全部数据集</option>
+          </select>
+        </div>
+        <div class="text-sm text-gray-500">
+          将导出 {{ exportTaskCount }} 条任务
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
+        <button @click="showExportModal=false" class="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
+        <button @click="executeExport" class="px-4 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700">导出</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Dialog -->
+  <div v-if="confirmDialog.show" class="fixed inset-0 z-50 flex items-center justify-center modal-mask">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
+      <p class="text-sm text-gray-700 mb-4">{{ confirmDialog.message }}</p>
+      <div class="flex justify-end gap-2">
+        <button @click="confirmDialog.show=false" class="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">取消</button>
+        <button @click="confirmDialog.action(); confirmDialog.show=false" class="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="fixed bottom-4 right-4 z-50 space-y-2">
+    <div v-for="(t, i) in toasts" :key="i"
+         :class="['px-4 py-2.5 rounded-lg shadow-lg text-sm transition-all', t.type==='success' ? 'bg-emerald-600 text-white' : t.type==='error' ? 'bg-red-600 text-white' : 'bg-gray-700 text-white']">
+      {{ t.message }}
+    </div>
+  </div>
+
+</div>
+
+<script>
+const { createApp, ref, reactive, computed, watch, onMounted, nextTick } = Vue;
+
+// ==================== CONSTANTS ====================
+const TASK_TYPE_LABELS = {
+  t2i: 'T2I 文生图',
+  t2v: 'T2V 文生视频',
+  i2v: 'I2V 图生视频',
+  i2i: 'I2I 图生图',
+  perler_beads: '拼豆',
+  i2lora: 'I2LoRA 风格'
+};
+
+const DIFFICULTY_LABELS = { low: '低', medium: '中', high: '高' };
+
+const STYLE_OPTIONS = [
+  { id: 'anime', zh: '动漫', en: 'Anime' },
+  { id: 'realistic', zh: '写实', en: 'Realistic' },
+  { id: 'sci_fi', zh: '科幻', en: 'Sci-Fi' },
+  { id: 'illustration', zh: '插画', en: 'Illustration' },
+  { id: 'character', zh: '角色', en: 'Character' },
+  { id: 'design', zh: '设计', en: 'Design' },
+  { id: 'fantasy', zh: '奇幻', en: 'Fantasy' },
+  { id: 'photography', zh: '摄影', en: 'Photography' },
+  { id: '3d', zh: '3D', en: '3D' },
+  { id: 'abstract', zh: '抽象', en: 'Abstract' },
+];
+
+const CAPABILITY_OPTIONS = [
+  { id: 'prompt_following', zh: 'Prompt遵循' },
+  { id: 'aesthetic_quality', zh: '美学质量' },
+  { id: 'consistency', zh: '一致性' },
+  { id: 'physical_plausibility', zh: '物理合理' },
+  { id: 'creativity', zh: '创意表现' },
+  { id: 'technical_quality', zh: '技术质量' },
+  { id: 'controllability', zh: '可控性' },
+];
+
+const SCENE_OPTIONS = [
+  { id: 'real_human', zh: '真实-人物' },
+  { id: 'real_animal', zh: '真实-动物' },
+  { id: 'real_nature', zh: '真实-自然' },
+  { id: 'real_still_life', zh: '真实-静物' },
+  { id: 'real_urban', zh: '真实-城市' },
+  { id: 'anime', zh: '动漫' },
+  { id: 'sci_fi', zh: '科幻' },
+  { id: 'fantasy', zh: '奇幻' },
+];
+
+const STORAGE_KEY = 'eval_dataset_platform_v1';
+
+// ==================== UTILITY FUNCTIONS ====================
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 9); }
+function now() { return new Date().toISOString(); }
+function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+
+function getDefaultParams(taskType) {
+  const base = { width: 0, height: 0, seed: null, model: '' };
+  switch(taskType) {
+    case 't2i': return { ...base, promptEn: '', promptZh: '', negativePrompt: '', steps: 30, cfgScale: 7.5, style: '', referenceImages: [] };
+    case 't2v': return { ...base, promptEn: '', promptZh: '', duration: 5, fps: 24, motionType: '' };
+    case 'i2v': return { ...base, firstFrameUrl: '', firstFramePromptEn: '', firstFramePromptZh: '', lastFrameUrl: '', lastFramePromptEn: '', lastFramePromptZh: '', initialPrompt: '', intentCn: '', duration: 5 };
+    case 'i2i': return { ...base, promptEn: '', promptZh: '', negativePrompt: '', inputImageUrl: '', strength: 0.7, controlnetType: '' };
+    case 'perler_beads': return { inputImageUrl: '', promptEn: '', palette: '', size: '', style: '' };
+    case 'i2lora': return { styleDescription: '', trainingImages: [''], testPrompts: [''] };
+    default: return base;
+  }
+}
+
+// ==================== APP ====================
+const app = createApp({
+  setup() {
+    // ---- State ----
+    const datasets = ref([]);
+    const activeDatasetId = ref(null);
+    const searchQuery = ref('');
+    const viewMode = ref('grid');
+    const sortBy = ref('created_desc');
+    const currentPage = ref(1);
+    const pageSize = 20;
+    const lastSaved = ref(null);
+
+    // Modals
+    const showDatasetModal = ref(false);
+    const showTaskModal = ref(false);
+    const showDetailModal = ref(false);
+    const showImportModal = ref(false);
+    const showExportModal = ref(false);
+
+    // Forms
+    const editingDataset = ref(null);
+    const datasetForm = reactive({ name: '', description: '', taskType: '' });
+    const editingTask = ref(null);
+    const taskForm = reactive({ evalId: '', difficulty: 'medium', styleCategories: [], capabilityFocus: [], sceneType: '', customTags: [], params: {}, metadataFields: [], notes: '' });
+    const newCustomTag = ref('');
+    const detailTask = ref(null);
+
+    // Import/Export
+    const importMode = ref('file');
+    const importJsonText = ref('');
+    const importFormat = ref('auto');
+    const importPreview = ref('');
+    const importError = ref('');
+    const exportFormat = ref('csv');
+    const exportScope = ref('current');
+
+    // Filters
+    const filters = reactive({ difficulty: [], style: [], capability: [], scene: [], customTag: [] });
+
+    // Confirm dialog
+    const confirmDialog = reactive({ show: false, message: '', action: () => {} });
+
+    // Toasts
+    const toasts = ref([]);
+
+    // ---- Computed ----
+    const activeDataset = computed(() => datasets.value.find(d => d.id === activeDatasetId.value));
+
+    const allCustomTags = computed(() => {
+      if (!activeDataset.value) return [];
+      const tags = new Set();
+      activeDataset.value.tasks.forEach(t => t.customTags.forEach(tag => tags.add(tag)));
+      return [...tags].sort();
+    });
+
+    const filteredTasks = computed(() => {
+      if (!activeDataset.value) return [];
+      let tasks = [...activeDataset.value.tasks];
+
+      // Search
+      if (searchQuery.value) {
+        const q = searchQuery.value.toLowerCase();
+        tasks = tasks.filter(t =>
+          t.evalId.toLowerCase().includes(q) ||
+          JSON.stringify(t.params).toLowerCase().includes(q) ||
+          t.customTags.some(tag => tag.toLowerCase().includes(q)) ||
+          (t.notes || '').toLowerCase().includes(q)
+        );
+      }
+
+      // Filters
+      if (filters.difficulty.length) tasks = tasks.filter(t => filters.difficulty.includes(t.difficulty));
+      if (filters.style.length) tasks = tasks.filter(t => t.styleCategories.some(s => filters.style.includes(s)));
+      if (filters.capability.length) tasks = tasks.filter(t => t.capabilityFocus.some(c => filters.capability.includes(c)));
+      if (filters.scene.length) tasks = tasks.filter(t => filters.scene.includes(t.sceneType));
+      if (filters.customTag.length) tasks = tasks.filter(t => t.customTags.some(tag => filters.customTag.includes(tag)));
+
+      // Sort
+      tasks.sort((a, b) => {
+        switch(sortBy.value) {
+          case 'created_asc': return new Date(a.createdAt) - new Date(b.createdAt);
+          case 'evalId': return a.evalId.localeCompare(b.evalId);
+          case 'difficulty': return ['low','medium','high'].indexOf(a.difficulty) - ['low','medium','high'].indexOf(b.difficulty);
+          default: return new Date(b.createdAt) - new Date(a.createdAt);
+        }
+      });
+      return tasks;
+    });
+
+    const totalPages = computed(() => Math.ceil(filteredTasks.value.length / pageSize));
+    const paginatedTasks = computed(() => {
+      const start = (currentPage.value - 1) * pageSize;
+      return filteredTasks.value.slice(start, start + pageSize);
+    });
+
+    const hasActiveFilters = computed(() =>
+      filters.difficulty.length || filters.style.length || filters.capability.length || filters.scene.length || filters.customTag.length
+    );
+
+    const difficultyStats = computed(() => {
+      if (!activeDataset.value) return {};
+      const stats = {};
+      activeDataset.value.tasks.forEach(t => { stats[t.difficulty] = (stats[t.difficulty] || 0) + 1; });
+      return stats;
+    });
+
+    const suggestedEvalId = computed(() => {
+      if (!activeDataset.value) return '';
+      const prefix = activeDataset.value.taskType + '_';
+      const nums = activeDataset.value.tasks.map(t => { const m = t.evalId.match(/_(\d+)$/); return m ? parseInt(m[1]) : 0; });
+      return prefix + String(Math.max(0, ...nums) + 1).padStart(3, '0');
+    });
+
+    const lastSavedText = computed(() => {
+      if (!lastSaved.value) return '未保存';
+      const diff = Math.round((Date.now() - lastSaved.value) / 1000);
+      if (diff < 60) return `${diff}s 前保存`;
+      return `${Math.round(diff/60)}m 前保存`;
+    });
+
+    const storageSize = computed(() => {
+      try {
+        const data = localStorage.getItem(STORAGE_KEY);
+        if (!data) return '0 KB';
+        const bytes = new Blob([data]).size;
+        return bytes < 1024 ? bytes + ' B' : (bytes / 1024).toFixed(1) + ' KB';
+      } catch { return '-'; }
+    });
+
+    const exportTaskCount = computed(() => {
+      if (exportScope.value === 'all') return datasets.value.reduce((sum, d) => sum + d.tasks.length, 0);
+      if (exportScope.value === 'filtered') return filteredTasks.value.length;
+      return activeDataset.value ? activeDataset.value.tasks.length : 0;
+    });
+
+    // ---- Methods ----
+    function toast(message, type = 'success') {
+      const t = { message, type };
+      toasts.value.push(t);
+      setTimeout(() => { const i = toasts.value.indexOf(t); if (i > -1) toasts.value.splice(i, 1); }, 3000);
+    }
+
+    const saveToStorage = debounce(() => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: '1.0', datasets: datasets.value }));
+        lastSaved.value = Date.now();
+      } catch (e) {
+        toast('存储空间不足，请导出数据后清理', 'error');
+      }
+    }, 500);
+
+    function loadFromStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const data = JSON.parse(raw);
+          datasets.value = data.datasets || [];
+          if (datasets.value.length) activeDatasetId.value = datasets.value[0].id;
+          lastSaved.value = Date.now();
+        }
+      } catch (e) { console.error('Load error:', e); }
+    }
+
+    // Dataset CRUD
+    function openCreateDataset() {
+      editingDataset.value = null;
+      datasetForm.name = '';
+      datasetForm.description = '';
+      datasetForm.taskType = '';
+      showDatasetModal.value = true;
+    }
+
+    function editDataset(ds) {
+      editingDataset.value = ds;
+      datasetForm.name = ds.name;
+      datasetForm.description = ds.description;
+      datasetForm.taskType = ds.taskType;
+      showDatasetModal.value = true;
+    }
+
+    function saveDataset() {
+      if (editingDataset.value) {
+        editingDataset.value.name = datasetForm.name;
+        editingDataset.value.description = datasetForm.description;
+        editingDataset.value.updatedAt = now();
+        toast('数据集已更新');
+      } else {
+        const ds = {
+          id: uid(),
+          name: datasetForm.name,
+          description: datasetForm.description,
+          taskType: datasetForm.taskType,
+          tasks: [],
+          metadata: {},
+          createdAt: now(),
+          updatedAt: now(),
+        };
+        datasets.value.push(ds);
+        activeDatasetId.value = ds.id;
+        toast('数据集已创建');
+      }
+      showDatasetModal.value = false;
+      saveToStorage();
+    }
+
+    function selectDataset(id) {
+      activeDatasetId.value = id;
+      currentPage.value = 1;
+      clearFilters();
+    }
+
+    function deleteDataset(ds) {
+      confirmDialog.message = `确定删除数据集「${ds.name}」及其所有任务？`;
+      confirmDialog.action = () => {
+        datasets.value = datasets.value.filter(d => d.id !== ds.id);
+        if (activeDatasetId.value === ds.id) activeDatasetId.value = datasets.value.length ? datasets.value[0].id : null;
+        saveToStorage();
+        toast('数据集已删除');
+      };
+      confirmDialog.show = true;
+    }
+
+    // Task CRUD
+    function openCreateTask() {
+      editingTask.value = null;
+      Object.assign(taskForm, {
+        evalId: suggestedEvalId.value,
+        difficulty: 'medium',
+        styleCategories: [],
+        capabilityFocus: [],
+        sceneType: '',
+        customTags: [],
+        params: getDefaultParams(activeDataset.value.taskType),
+        metadataFields: [],
+        notes: '',
+      });
+      showTaskModal.value = true;
+    }
+
+    function openTaskDetail(task) {
+      detailTask.value = task;
+      showDetailModal.value = true;
+    }
+
+    function editTaskFromDetail() {
+      showDetailModal.value = false;
+      editingTask.value = detailTask.value;
+      Object.assign(taskForm, {
+        evalId: detailTask.value.evalId,
+        difficulty: detailTask.value.difficulty,
+        styleCategories: [...detailTask.value.styleCategories],
+        capabilityFocus: [...detailTask.value.capabilityFocus],
+        sceneType: detailTask.value.sceneType || '',
+        customTags: [...detailTask.value.customTags],
+        params: JSON.parse(JSON.stringify(detailTask.value.params)),
+        metadataFields: Object.entries(detailTask.value.metadata || {}).map(([key, value]) => ({ key, value: typeof value === 'string' ? value : JSON.stringify(value) })),
+        notes: detailTask.value.notes || '',
+      });
+      showTaskModal.value = true;
+    }
+
+    function saveTask() {
+      const metadata = {};
+      taskForm.metadataFields.forEach(f => { if (f.key) metadata[f.key] = f.value; });
+
+      if (editingTask.value) {
+        Object.assign(editingTask.value, {
+          evalId: taskForm.evalId,
+          difficulty: taskForm.difficulty,
+          styleCategories: [...taskForm.styleCategories],
+          capabilityFocus: [...taskForm.capabilityFocus],
+          sceneType: taskForm.sceneType || null,
+          customTags: [...taskForm.customTags],
+          params: JSON.parse(JSON.stringify(taskForm.params)),
+          metadata,
+          notes: taskForm.notes,
+          updatedAt: now(),
+        });
+        toast('任务已更新');
+      } else {
+        activeDataset.value.tasks.push({
+          id: uid(),
+          evalId: taskForm.evalId,
+          difficulty: taskForm.difficulty,
+          styleCategories: [...taskForm.styleCategories],
+          capabilityFocus: [...taskForm.capabilityFocus],
+          sceneType: taskForm.sceneType || null,
+          customTags: [...taskForm.customTags],
+          params: JSON.parse(JSON.stringify(taskForm.params)),
+          metadata,
+          notes: taskForm.notes,
+          createdAt: now(),
+          updatedAt: now(),
+        });
+        activeDataset.value.updatedAt = now();
+        toast('任务已创建');
+      }
+      showTaskModal.value = false;
+      saveToStorage();
+    }
+
+    function duplicateTask(task) {
+      const newTask = JSON.parse(JSON.stringify(task));
+      newTask.id = uid();
+      newTask.evalId = task.evalId + '_copy';
+      newTask.createdAt = now();
+      newTask.updatedAt = now();
+      activeDataset.value.tasks.push(newTask);
+      saveToStorage();
+      toast('任务已复制');
+    }
+
+    function confirmDeleteTask(task) {
+      confirmDialog.message = `确定删除任务「${task.evalId}」？`;
+      confirmDialog.action = () => {
+        activeDataset.value.tasks = activeDataset.value.tasks.filter(t => t.id !== task.id);
+        saveToStorage();
+        toast('任务已删除');
+      };
+      confirmDialog.show = true;
+    }
+
+    // Tag toggles
+    function toggleTaskStyle(id) {
+      const i = taskForm.styleCategories.indexOf(id);
+      if (i > -1) taskForm.styleCategories.splice(i, 1);
+      else taskForm.styleCategories.push(id);
+    }
+    function toggleTaskCapability(id) {
+      const i = taskForm.capabilityFocus.indexOf(id);
+      if (i > -1) taskForm.capabilityFocus.splice(i, 1);
+      else taskForm.capabilityFocus.push(id);
+    }
+    function addCustomTag() {
+      const tag = newCustomTag.value.trim();
+      if (tag && !taskForm.customTags.includes(tag)) {
+        taskForm.customTags.push(tag);
+        newCustomTag.value = '';
+      }
+    }
+    function addMetadataField() { taskForm.metadataFields.push({ key: '', value: '' }); }
+
+    // Filters
+    function toggleFilter(dim, val) {
+      const arr = filters[dim];
+      const i = arr.indexOf(val);
+      if (i > -1) arr.splice(i, 1);
+      else arr.push(val);
+      currentPage.value = 1;
+    }
+    function clearFilters() {
+      filters.difficulty = [];
+      filters.style = [];
+      filters.capability = [];
+      filters.scene = [];
+      filters.customTag = [];
+    }
+
+    // Display helpers
+    function taskTypeColor(type) {
+      const colors = { t2i: 'bg-blue-400', t2v: 'bg-purple-400', i2v: 'bg-emerald-400', i2i: 'bg-orange-400', perler_beads: 'bg-pink-400', i2lora: 'bg-cyan-400' };
+      return colors[type] || 'bg-gray-400';
+    }
+    function difficultyColor(d) {
+      return { low: 'bg-green-100 text-green-700', medium: 'bg-yellow-100 text-yellow-700', high: 'bg-red-100 text-red-700' }[d] || '';
+    }
+    function difficultyColorActive(d) {
+      return { low: 'bg-green-100 text-green-700 border-green-300', medium: 'bg-yellow-100 text-yellow-700 border-yellow-300', high: 'bg-red-100 text-red-700 border-red-300' }[d] || '';
+    }
+    function getStyleLabel(id) { return STYLE_OPTIONS.find(s => s.id === id)?.zh || id; }
+    function getCapabilityLabel(id) { return CAPABILITY_OPTIONS.find(c => c.id === id)?.zh || id; }
+    function getSceneLabel(id) { return SCENE_OPTIONS.find(s => s.id === id)?.zh || id; }
+    function formatDate(iso) { if (!iso) return '-'; return new Date(iso).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }); }
+
+    function getTaskThumbnail(task) {
+      const p = task.params;
+      return p.firstFrameUrl || p.inputImageUrl || (p.referenceImages && p.referenceImages[0]) || (p.trainingImages && p.trainingImages[0]) || '';
+    }
+
+    function getTaskPromptPreview(task) {
+      const p = task.params;
+      return p.initialPrompt || p.intentCn || p.promptEn || p.promptZh || p.styleDescription || task.evalId;
+    }
+
+    function getDetailMediaList() {
+      if (!detailTask.value) return [];
+      const p = detailTask.value.params;
+      const list = [];
+      if (p.firstFrameUrl) list.push({ label: '首帧', url: p.firstFrameUrl });
+      if (p.lastFrameUrl) list.push({ label: '尾帧', url: p.lastFrameUrl });
+      if (p.inputImageUrl) list.push({ label: '输入图片', url: p.inputImageUrl });
+      if (p.referenceImages) p.referenceImages.forEach((u, i) => { if (u) list.push({ label: `参考图 ${i+1}`, url: u }); });
+      if (p.trainingImages) p.trainingImages.forEach((u, i) => { if (u) list.push({ label: `训练图 ${i+1}`, url: u }); });
+      return list;
+    }
+
+    function getDetailParams() {
+      if (!detailTask.value) return {};
+      const p = { ...detailTask.value.params };
+      // Remove media fields from params display
+      delete p.firstFrameUrl; delete p.lastFrameUrl; delete p.inputImageUrl;
+      delete p.referenceImages; delete p.trainingImages;
+      // Clean empty values
+      const clean = {};
+      for (const [k, v] of Object.entries(p)) {
+        if (v !== '' && v !== null && v !== undefined && !(Array.isArray(v) && v.length === 0)) clean[k] = v;
+      }
+      return clean;
+    }
+
+    // Import
+    function handleFileImport(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        importJsonText.value = ev.target.result;
+        detectImportFormat();
+      };
+      reader.readAsText(file);
+    }
+
+    function detectImportFormat() {
+      importError.value = '';
+      importPreview.value = '';
+      try {
+        const data = JSON.parse(importJsonText.value);
+        if (data.version && data.datasets) {
+          importFormat.value = 'platform';
+          importPreview.value = `平台格式: ${data.datasets.length} 个数据集`;
+        } else if (Array.isArray(data.tasks || data)) {
+          const arr = data.tasks || data;
+          if (arr[0] && arr[0].first_frame) {
+            importFormat.value = 'i2v_legacy';
+            importPreview.value = `I2V Legacy 格式: ${arr.length} 个任务`;
+          } else if (arr[0] && arr[0].style_description) {
+            importFormat.value = 'i2lora_legacy';
+            importPreview.value = `I2LoRA Legacy 格式: ${arr.length} 个风格`;
+          } else {
+            importPreview.value = `检测到 ${arr.length} 条数据`;
+          }
+        }
+      } catch (e) {
+        importError.value = 'JSON 解析失败: ' + e.message;
+      }
+    }
+
+    function executeImport() {
+      importError.value = '';
+      try {
+        const data = JSON.parse(importJsonText.value);
+        const format = importFormat.value === 'auto' ? detectFormat(data) : importFormat.value;
+
+        if (format === 'platform') {
+          const imported = data.datasets || [];
+          imported.forEach(ds => { ds.id = uid(); ds.tasks.forEach(t => t.id = uid()); });
+          datasets.value.push(...imported);
+          toast(`已导入 ${imported.length} 个数据集`);
+        } else if (format === 'i2v_legacy') {
+          const arr = data.tasks || data;
+          const ds = {
+            id: uid(), name: '导入-I2V数据集', description: '从 legacy JSON 导入', taskType: 'i2v',
+            tasks: arr.map(t => adaptI2VLegacy(t)), metadata: {}, createdAt: now(), updatedAt: now(),
+          };
+          datasets.value.push(ds);
+          activeDatasetId.value = ds.id;
+          toast(`已导入 ${arr.length} 条 I2V 任务`);
+        } else if (format === 'i2lora_legacy') {
+          const arr = Array.isArray(data) ? data : [data];
+          const ds = {
+            id: uid(), name: '导入-I2LoRA数据集', description: '从 legacy JSON 导入', taskType: 'i2lora',
+            tasks: arr.map(t => adaptI2LoRALegacy(t)), metadata: {}, createdAt: now(), updatedAt: now(),
+          };
+          datasets.value.push(ds);
+          activeDatasetId.value = ds.id;
+          toast(`已导入 ${arr.length} 条 I2LoRA 任务`);
+        } else {
+          importError.value = '无法识别数据格式';
+          return;
+        }
+        showImportModal.value = false;
+        saveToStorage();
+      } catch (e) {
+        importError.value = '导入失败: ' + e.message;
+      }
+    }
+
+    function detectFormat(data) {
+      if (data.version && data.datasets) return 'platform';
+      const arr = data.tasks || (Array.isArray(data) ? data : null);
+      if (arr && arr[0]) {
+        if (arr[0].first_frame) return 'i2v_legacy';
+        if (arr[0].style_description) return 'i2lora_legacy';
+      }
+      return 'unknown';
+    }
+
+    function adaptI2VLegacy(t) {
+      const diffMap = { '低': 'low', '中': 'medium', '高': 'high', low: 'low', medium: 'medium', high: 'high' };
+      const sceneMap = { '真实-人物': 'real_human', '真实-动物': 'real_animal', '真实-自然': 'real_nature', '真实-静物': 'real_still_life', '真实-静物/生活': 'real_still_life', '真实-城市': 'real_urban', '动漫': 'anime', '科幻': 'sci_fi', '奇幻': 'fantasy' };
+      return {
+        id: uid(), evalId: `i2v_${String(t.id).padStart(3, '0')}`,
+        difficulty: diffMap[t.difficulty] || 'medium',
+        styleCategories: [], capabilityFocus: ['consistency', 'prompt_following'],
+        sceneType: sceneMap[t.category] || null,
+        customTags: t.category ? [t.category] : [],
+        params: {
+          firstFrameUrl: '', firstFramePromptEn: t.first_frame?.en || '', firstFramePromptZh: t.first_frame?.cn || '',
+          lastFrameUrl: '', lastFramePromptEn: t.last_frame?.en || '', lastFramePromptZh: t.last_frame?.cn || '',
+          initialPrompt: t.initial_prompt || '', intentCn: t.intent_cn || '',
+          width: 1920, height: 1080, duration: 5, seed: null, model: '',
+        },
+        metadata: { source: 'i2v_legacy_import', originalId: t.id },
+        notes: '', createdAt: now(), updatedAt: now(),
+      };
+    }
+
+    function adaptI2LoRALegacy(t) {
+      return {
+        id: uid(), evalId: t.style_id || `i2lora_${uid().slice(0,4)}`,
+        difficulty: 'medium', styleCategories: [], capabilityFocus: ['consistency', 'creativity'],
+        sceneType: null, customTags: [],
+        params: {
+          styleDescription: t.style_description || '',
+          trainingImages: (t.content_variants || t.images || []).map(v => v.file_name || v.path || ''),
+          testPrompts: t.test_prompts ? [t.test_prompts.no_style || t.test_prompts.without_style || ''] : [''],
+        },
+        metadata: { source: 'i2lora_legacy_import' },
+        notes: '', createdAt: now(), updatedAt: now(),
+      };
+    }
+
+    // Export
+    function executeExport() {
+      let tasks = [];
+      let dsName = 'all';
+      if (exportScope.value === 'all') {
+        datasets.value.forEach(ds => ds.tasks.forEach(t => tasks.push({ ...t, _datasetName: ds.name, _taskType: ds.taskType })));
+      } else if (exportScope.value === 'filtered') {
+        tasks = filteredTasks.value.map(t => ({ ...t, _datasetName: activeDataset.value.name, _taskType: activeDataset.value.taskType }));
+        dsName = activeDataset.value.name;
+      } else {
+        tasks = activeDataset.value.tasks.map(t => ({ ...t, _datasetName: activeDataset.value.name, _taskType: activeDataset.value.taskType }));
+        dsName = activeDataset.value.name;
+      }
+
+      if (exportFormat.value === 'csv') {
+        exportCSV(tasks, dsName);
+      } else {
+        exportJSON(dsName);
+      }
+      showExportModal.value = false;
+      toast('导出成功');
+    }
+
+    function exportCSV(tasks, dsName) {
+      const headers = ['eval_id','task_type','difficulty','style_categories','capability_focus','scene_type','custom_tags',
+        'prompt_en','prompt_zh','negative_prompt','first_frame_url','last_frame_url','input_image_url',
+        'initial_prompt','intent_cn','width','height','duration','fps','seed','steps','cfg_scale',
+        'strength','model','style','motion_type','controlnet_type','notes'];
+
+      const rows = tasks.map(t => {
+        const p = t.params || {};
+        return [
+          t.evalId, t._taskType, t.difficulty,
+          (t.styleCategories||[]).join(';'), (t.capabilityFocus||[]).join(';'), t.sceneType||'', (t.customTags||[]).join(';'),
+          p.promptEn||p.firstFramePromptEn||'', p.promptZh||p.firstFramePromptZh||'', p.negativePrompt||'',
+          p.firstFrameUrl||'', p.lastFrameUrl||'', p.inputImageUrl||'',
+          p.initialPrompt||'', p.intentCn||'',
+          p.width||'', p.height||'', p.duration||'', p.fps||'', p.seed||'', p.steps||'', p.cfgScale||'',
+          p.strength||'', p.model||'', p.style||'', p.motionType||'', p.controlnetType||'', t.notes||''
+        ].map(v => `"${String(v).replace(/"/g, '""')}"`);
+      });
+
+      const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      downloadFile(csv, `eval_${dsName.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.csv`, 'text/csv');
+    }
+
+    function exportJSON(dsName) {
+      const data = exportScope.value === 'all'
+        ? { version: '1.0', datasets: datasets.value }
+        : { version: '1.0', datasets: [activeDataset.value] };
+      downloadFile(JSON.stringify(data, null, 2), `eval_backup_${new Date().toISOString().slice(0,10)}.json`, 'application/json');
+    }
+
+    function downloadFile(content, filename, mime) {
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename; a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // ---- Lifecycle ----
+    onMounted(() => {
+      loadFromStorage();
+      // Auto-save watcher
+      watch(datasets, () => saveToStorage(), { deep: true });
+      // Update lastSavedText every 10s
+      setInterval(() => { lastSaved.value = lastSaved.value; }, 10000);
+    });
+
+    // ---- Keyboard shortcuts ----
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        showDatasetModal.value = false;
+        showTaskModal.value = false;
+        showDetailModal.value = false;
+        showImportModal.value = false;
+        showExportModal.value = false;
+        confirmDialog.show = false;
+      }
+    });
+
+    return {
+      // Constants
+      TASK_TYPE_LABELS, DIFFICULTY_LABELS, STYLE_OPTIONS, CAPABILITY_OPTIONS, SCENE_OPTIONS,
+      // State
+      datasets, activeDatasetId, activeDataset, searchQuery, viewMode, sortBy, currentPage, pageSize, lastSaved,
+      showDatasetModal, showTaskModal, showDetailModal, showImportModal, showExportModal,
+      editingDataset, datasetForm, editingTask, taskForm, newCustomTag, detailTask,
+      importMode, importJsonText, importFormat, importPreview, importError,
+      exportFormat, exportScope, exportTaskCount,
+      filters, confirmDialog, toasts,
+      // Computed
+      filteredTasks, paginatedTasks, totalPages, hasActiveFilters, difficultyStats, allCustomTags, suggestedEvalId, lastSavedText, storageSize,
+      // Methods
+      toast, openCreateDataset, editDataset, saveDataset, selectDataset, deleteDataset,
+      openCreateTask, openTaskDetail, editTaskFromDetail, saveTask, duplicateTask, confirmDeleteTask,
+      toggleTaskStyle, toggleTaskCapability, addCustomTag, addMetadataField,
+      toggleFilter, clearFilters,
+      taskTypeColor, difficultyColor, difficultyColorActive, getStyleLabel, getCapabilityLabel, getSceneLabel, formatDate,
+      getTaskThumbnail, getTaskPromptPreview, getDetailMediaList, getDetailParams,
+      handleFileImport, detectImportFormat, executeImport, executeExport,
+    };
+  }
+});
+app.mount('#app');
+</script>
+</body>
+</html>
