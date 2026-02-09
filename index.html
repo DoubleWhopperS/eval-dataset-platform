@@ -1881,20 +1881,38 @@ const app = createApp({
       return { headers, rows: result };
     }
 
-    // Map CSV column names to task fields
+    // Map CSV column names to task fields (canonical names only)
     const CSV_COL_MAP = {
-      'eval_id': 'evalId', 'prompt': 'params.prompt', 'text': 'params.prompt',
+      'eval_id': 'evalId', 'prompt': 'params.prompt',
       'negative_prompt': 'params.negativePrompt',
-      'image': 'params.firstFrameUrl', 'first_frame_url': 'params.firstFrameUrl',
+      'first_frame_url': 'params.firstFrameUrl',
       'last_frame_url': 'params.lastFrameUrl', 'input_image_url': 'params.inputImageUrl',
-      'user_image': 'params.inputImageUrl', 'reference': 'params.referenceImageUrl',
-      'reference_image': 'params.referenceImageUrl', 'reference_image_url': 'params.referenceImageUrl',
+      'reference_image_url': 'params.referenceImageUrl',
       'width': 'params.width', 'height': 'params.height', 'duration': 'params.duration',
       'fps': 'params.fps', 'seed': 'params.seed', 'steps': 'params.steps',
       'cfg_scale': 'params.cfgScale', 'strength': 'params.strength', 'model': 'params.model',
       'style': 'params.style', 'motion_type': 'params.motionType', 'controlnet_type': 'params.controlnetType',
       'notes': 'notes', 'difficulty': 'difficulty', 'custom_tags': 'customTags',
     };
+    // Aliases → canonical column names (resolved before mapping)
+    const CSV_COL_ALIASES = {
+      'text': 'prompt',
+      'image': 'first_frame_url',
+      'user_image': 'input_image_url',
+      'reference': 'reference_image_url',
+      'reference_image': 'reference_image_url',
+    };
+    function normalizeCSVHeaders(headers) {
+      return headers.map(h => CSV_COL_ALIASES[h] || h);
+    }
+    function normalizeCSVRow(row) {
+      const out = {};
+      for (const [key, val] of Object.entries(row)) {
+        const canonical = CSV_COL_ALIASES[key] || key;
+        if (out[canonical] === undefined) out[canonical] = val;
+      }
+      return out;
+    }
     const CSV_NUMBER_FIELDS = new Set(['width','height','duration','fps','seed','steps','cfg_scale','strength','frame_count']);
 
     function adaptCSVRow(row, taskType, index) {
@@ -2020,7 +2038,7 @@ const app = createApp({
     }
 
     // Helper: import tasks into existing or new dataset
-    function importTasksToDataset(tasks, taskType, defaultName, description) {
+    function importTasksToDataset(tasks, taskType, defaultName, description, csvHeaders) {
       const target = importTargetDataset.value;
       if (target !== '_new') {
         // Append to existing dataset
@@ -2033,9 +2051,11 @@ const app = createApp({
       } else {
         // Create new dataset
         const dsName = csvDatasetName.value || defaultName;
+        const meta = {};
+        if (csvHeaders) meta.csvHeaders = csvHeaders;
         const ds = {
           id: uid(), name: dsName, description,
-          taskType, tasks, metadata: {}, createdAt: now(), updatedAt: now(),
+          taskType, tasks, metadata: meta, createdAt: now(), updatedAt: now(),
         };
         datasets.value.push(ds);
         activeDatasetId.value = ds.id;
@@ -2049,9 +2069,32 @@ const app = createApp({
         const format = importFormat.value;
 
         if (format === 'csv') {
-          // CSV import
-          const { headers, rows } = parseCSV(importJsonText.value);
-          if (!rows.length) { importError.value = 'CSV 为空'; return; }
+          // CSV import — normalize column names via aliases first
+          const raw = parseCSV(importJsonText.value);
+          if (!raw.rows.length) { importError.value = 'CSV 为空'; return; }
+          const headers = normalizeCSVHeaders(raw.headers);
+          const rows = raw.rows.map(r => normalizeCSVRow(r));
+
+          // Schema validation for append: compare headers with existing dataset
+          if (importTargetDataset.value !== '_new') {
+            const targetDs = datasets.value.find(d => d.id === importTargetDataset.value);
+            if (targetDs && targetDs.metadata && targetDs.metadata.csvHeaders) {
+              const stored = [...targetDs.metadata.csvHeaders].sort().join(',');
+              const incoming = [...headers].sort().join(',');
+              if (stored !== incoming) {
+                const storedSet = new Set(targetDs.metadata.csvHeaders);
+                const incomingSet = new Set(headers);
+                const missing = targetDs.metadata.csvHeaders.filter(h => !incomingSet.has(h));
+                const extra = headers.filter(h => !storedSet.has(h));
+                let msg = '导入 CSV 列结构与已有数据不一致：\n';
+                if (missing.length) msg += `已有但本次缺少: ${missing.join(', ')}\n`;
+                if (extra.length) msg += `本次新增: ${extra.join(', ')}\n`;
+                msg += '\n继续导入可能导致数据不一致，确认继续？';
+                if (!confirm(msg)) return;
+              }
+            }
+          }
+
           const isPlatformCSV = headers.includes('eval_id') && headers.includes('task_type');
           if (isPlatformCSV && importTargetDataset.value === '_new') {
             // Platform export CSV without specific target: group by task_type
@@ -2066,7 +2109,7 @@ const app = createApp({
               const tasks = groupRows.map((r, i) => adaptCSVRow(r, tt, i));
               const ds = {
                 id: uid(), name: `CSV导入-${TASK_TYPE_LABELS[tt] || tt}`, description: '从平台 CSV 导入',
-                taskType: tt, tasks, metadata: {}, createdAt: now(), updatedAt: now(),
+                taskType: tt, tasks, metadata: { csvHeaders: headers }, createdAt: now(), updatedAt: now(),
               };
               datasets.value.push(ds);
               activeDatasetId.value = ds.id;
@@ -2078,7 +2121,7 @@ const app = createApp({
             if (!csvTaskType.value) { importError.value = '请选择任务类型'; return; }
             const tt = csvTaskType.value;
             const tasks = rows.map((r, i) => adaptCSVRow(r, tt, i));
-            const count = importTasksToDataset(tasks, tt, `CSV导入-${TASK_TYPE_LABELS[tt] || tt}`, '从 CSV 批量导入');
+            const count = importTasksToDataset(tasks, tt, `CSV导入-${TASK_TYPE_LABELS[tt] || tt}`, '从 CSV 批量导入', headers);
             if (count > 0) toast(`已导入 ${count} 条 ${TASK_TYPE_LABELS[tt]} 任务`);
           }
         } else {
