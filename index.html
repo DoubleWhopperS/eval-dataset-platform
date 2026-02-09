@@ -257,6 +257,10 @@
                   <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z"/></svg>
                 </div>
                 <span class="absolute top-2 left-2 tag-badge bg-white/90 text-gray-600 shadow-sm">{{ task.evalId }}</span>
+                <span v-if="getTaskMediaCount(task) > 1" class="absolute top-2 right-2 tag-badge bg-black/60 text-white shadow-sm text-[10px]">
+                  <svg class="w-3 h-3 inline-block mr-0.5 -mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z"/></svg>
+                  {{ getTaskMediaCount(task) }}
+                </span>
               </div>
               <!-- Info -->
               <div class="p-3">
@@ -637,6 +641,10 @@
               <div>
                 <label class="block text-xs text-gray-500 mb-1">输入图片 (URL/路径) *</label>
                 <input v-model="taskForm.params.inputImageUrl" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+              </div>
+              <div>
+                <label class="block text-xs text-gray-500 mb-1">参考图 (URL/路径)</label>
+                <input v-model="taskForm.params.referenceImageUrl" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
               </div>
               <div>
                 <label class="block text-xs text-gray-500 mb-1">Prompt</label>
@@ -1219,7 +1227,7 @@ function getDefaultParams(taskType) {
     case 't2v': return { ...base, prompt: '', duration: 5, fps: 24, motionType: '' };
     case 'i2v': return { ...base, firstFrameUrl: '', lastFrameUrl: '', prompt: '', duration: 5 };
     case 'i2i': return { ...base, prompt: '', negativePrompt: '', inputImageUrl: '', strength: 0.7, controlnetType: '' };
-    case 'perler_beads': return { inputImageUrl: '', prompt: '', palette: '', size: '', style: '' };
+    case 'perler_beads': return { inputImageUrl: '', referenceImageUrl: '', prompt: '', palette: '', size: '', style: '' };
     case 'i2lora': return { styleDescription: '', trainingImages: [''], testPrompts: [''] };
     default: return base;
   }
@@ -1781,7 +1789,22 @@ const app = createApp({
 
     function getTaskThumbnail(task) {
       const p = task.params;
-      return p.firstFrameUrl || p.inputImageUrl || (p.referenceImages && p.referenceImages[0]) || (p.trainingImages && p.trainingImages[0]) || '';
+      return p.firstFrameUrl || p.inputImageUrl || p.referenceImageUrl
+        || (p.referenceImages && p.referenceImages[0]) || (p.trainingImages && p.trainingImages[0])
+        || (p.extraImages && p.extraImages[0] && p.extraImages[0].url) || '';
+    }
+
+    function getTaskMediaCount(task) {
+      const p = task.params;
+      let count = 0;
+      if (p.firstFrameUrl) count++;
+      if (p.lastFrameUrl) count++;
+      if (p.inputImageUrl) count++;
+      if (p.referenceImageUrl) count++;
+      if (p.referenceImages) count += p.referenceImages.filter(Boolean).length;
+      if (p.trainingImages) count += p.trainingImages.filter(Boolean).length;
+      if (p.extraImages) count += p.extraImages.length;
+      return count;
     }
 
     function getTaskPromptPreview(task) {
@@ -1796,8 +1819,10 @@ const app = createApp({
       if (p.firstFrameUrl) list.push({ label: '首帧', url: p.firstFrameUrl });
       if (p.lastFrameUrl) list.push({ label: '尾帧', url: p.lastFrameUrl });
       if (p.inputImageUrl) list.push({ label: '输入图片', url: p.inputImageUrl });
+      if (p.referenceImageUrl) list.push({ label: '参考图', url: p.referenceImageUrl });
       if (p.referenceImages) p.referenceImages.forEach((u, i) => { if (u) list.push({ label: `参考图 ${i+1}`, url: u }); });
       if (p.trainingImages) p.trainingImages.forEach((u, i) => { if (u) list.push({ label: `训练图 ${i+1}`, url: u }); });
+      if (p.extraImages) p.extraImages.forEach(img => { if (img.url) list.push({ label: img.label || '图片', url: img.url }); });
       return list;
     }
 
@@ -1806,7 +1831,8 @@ const app = createApp({
       const p = { ...detailTask.value.params };
       // Remove media fields from params display
       delete p.firstFrameUrl; delete p.lastFrameUrl; delete p.inputImageUrl;
-      delete p.referenceImages; delete p.trainingImages;
+      delete p.referenceImageUrl; delete p.referenceImages; delete p.trainingImages;
+      delete p.extraImages;
       // Clean empty values
       const clean = {};
       for (const [k, v] of Object.entries(p)) {
@@ -1857,9 +1883,12 @@ const app = createApp({
 
     // Map CSV column names to task fields
     const CSV_COL_MAP = {
-      'eval_id': 'evalId', 'prompt': 'params.prompt', 'negative_prompt': 'params.negativePrompt',
+      'eval_id': 'evalId', 'prompt': 'params.prompt', 'text': 'params.prompt',
+      'negative_prompt': 'params.negativePrompt',
       'image': 'params.firstFrameUrl', 'first_frame_url': 'params.firstFrameUrl',
       'last_frame_url': 'params.lastFrameUrl', 'input_image_url': 'params.inputImageUrl',
+      'user_image': 'params.inputImageUrl', 'reference': 'params.referenceImageUrl',
+      'reference_image': 'params.referenceImageUrl', 'reference_image_url': 'params.referenceImageUrl',
       'width': 'params.width', 'height': 'params.height', 'duration': 'params.duration',
       'fps': 'params.fps', 'seed': 'params.seed', 'steps': 'params.steps',
       'cfg_scale': 'params.cfgScale', 'strength': 'params.strength', 'model': 'params.model',
@@ -1907,13 +1936,21 @@ const app = createApp({
           }
         }
       }
-      // Unknown columns → metadata
+      // Unknown columns → metadata, auto-detect image URLs
       const knownCols = new Set([...Object.keys(CSV_COL_MAP), 'task_type', 'frame_count']);
+      const imgUrlRe = /^https?:\/\/.+\.(png|jpe?g|gif|webp|bmp|svg|tiff?)(\?.*)?$/i;
+      const extraImages = [];
       for (const key of Object.keys(row)) {
         if (!knownCols.has(key) && !key.startsWith('tag_') && row[key]) {
-          task.metadata[key] = row[key];
+          const val = row[key];
+          if (typeof val === 'string' && imgUrlRe.test(val.trim())) {
+            extraImages.push({ label: key, url: val.trim() });
+          } else {
+            task.metadata[key] = val;
+          }
         }
       }
+      if (extraImages.length) params.extraImages = extraImages;
       return task;
     }
 
@@ -2162,7 +2199,7 @@ const app = createApp({
       const dims = tagConfig.value.dimensions;
       const dimHeaders = dims.map(d => 'tag_' + d.id);
       const headers = ['eval_id','task_type','difficulty', ...dimHeaders, 'custom_tags',
-        'prompt','negative_prompt','first_frame_url','last_frame_url','input_image_url',
+        'prompt','negative_prompt','first_frame_url','last_frame_url','input_image_url','reference_image_url',
         'width','height','duration','fps','seed','steps','cfg_scale',
         'strength','model','style','motion_type','controlnet_type','notes'];
 
@@ -2173,7 +2210,7 @@ const app = createApp({
           t.evalId, t._taskType, t.difficulty,
           ...tagCols, (t.customTags||[]).join(';'),
           p.prompt||'', p.negativePrompt||'',
-          p.firstFrameUrl||'', p.lastFrameUrl||'', p.inputImageUrl||'',
+          p.firstFrameUrl||'', p.lastFrameUrl||'', p.inputImageUrl||'', p.referenceImageUrl||'',
           p.width||'', p.height||'', p.duration||'', p.fps||'', p.seed||'', p.steps||'', p.cfgScale||'',
           p.strength||'', p.model||'', p.style||'', p.motionType||'', p.controlnetType||'', t.notes||''
         ].map(v => `"${String(v).replace(/"/g, '""')}"`);
@@ -2246,7 +2283,7 @@ const app = createApp({
       taskTypeColor, difficultyColor, difficultyColorActive,
       getStyleLabel, getCapabilityLabel, getSceneLabel, getTagLabel, getTagColor,
       getAllSelectableOptions, findTagLabel, formatDate,
-      getTaskThumbnail, getTaskPromptPreview, getDetailMediaList, getDetailParams,
+      getTaskThumbnail, getTaskMediaCount, getTaskPromptPreview, getDetailMediaList, getDetailParams,
       handleFileImport, detectImportFormat, executeImport, executeExport,
     };
   }
