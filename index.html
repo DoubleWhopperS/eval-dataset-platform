@@ -586,20 +586,12 @@
                 </div>
               </div>
               <div>
-                <label class="block text-xs text-gray-500 mb-1">首帧 Prompt</label>
-                <textarea v-model="taskForm.params.firstFramePrompt" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="中英文均可"></textarea>
-              </div>
-              <div>
                 <label class="block text-xs text-gray-500 mb-1">尾帧图片 (URL/路径)</label>
                 <input v-model="taskForm.params.lastFrameUrl" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
               </div>
               <div>
-                <label class="block text-xs text-gray-500 mb-1">尾帧 Prompt</label>
-                <textarea v-model="taskForm.params.lastFramePrompt" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="中英文均可"></textarea>
-              </div>
-              <div>
-                <label class="block text-xs text-gray-500 mb-1">视频意图 *</label>
-                <textarea v-model="taskForm.params.intent" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="中英文均可"></textarea>
+                <label class="block text-xs text-gray-500 mb-1">Prompt *</label>
+                <textarea v-model="taskForm.params.prompt" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="中英文均可"></textarea>
               </div>
               <div class="grid grid-cols-4 gap-3">
                 <div><label class="block text-xs text-gray-500 mb-1">Width</label><input v-model.number="taskForm.params.width" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="1920"></div>
@@ -797,25 +789,44 @@
           <div class="flex gap-2">
             <button @click="importMode='file'" :class="['px-3 py-1.5 text-sm border rounded-lg', importMode==='file' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-300 hover:bg-gray-50']">上传文件</button>
             <button @click="importMode='paste'" :class="['px-3 py-1.5 text-sm border rounded-lg', importMode==='paste' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-300 hover:bg-gray-50']">粘贴 JSON</button>
+            <button @click="importMode='paste_csv'" :class="['px-3 py-1.5 text-sm border rounded-lg', importMode==='paste_csv' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-300 hover:bg-gray-50']">粘贴 CSV</button>
           </div>
         </div>
         <div v-if="importMode==='file'">
-          <input type="file" accept=".json" @change="handleFileImport" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100">
+          <input type="file" accept=".json,.csv" @change="handleFileImport" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100">
         </div>
         <div v-if="importMode==='paste'">
           <textarea v-model="importJsonText" rows="10" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder='粘贴 JSON 数据...'></textarea>
+        </div>
+        <div v-if="importMode==='paste_csv'">
+          <textarea v-model="importJsonText" rows="10" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder='粘贴 CSV 数据（含表头行）...' @input="detectImportFormat"></textarea>
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">格式</label>
           <select v-model="importFormat" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
             <option value="auto">自动检测</option>
-            <option value="platform">平台原生格式</option>
-            <option value="i2v_legacy">I2V 首尾帧格式 (legacy)</option>
-            <option value="i2lora_legacy">I2LoRA 风格格式 (legacy)</option>
+            <option value="platform">平台原生 JSON</option>
+            <option value="i2v_legacy">I2V 首尾帧 JSON (legacy)</option>
+            <option value="i2lora_legacy">I2LoRA 风格 JSON (legacy)</option>
+            <option value="csv">CSV 批量导入</option>
           </select>
         </div>
+        <!-- CSV 配置区 -->
+        <div v-if="importFormat==='csv'" class="space-y-3 bg-gray-50 rounded-lg p-3">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">任务类型 *</label>
+            <select v-model="csvTaskType" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+              <option value="">请选择</option>
+              <option v-for="(label, key) in TASK_TYPE_LABELS" :key="key" :value="key">{{ label }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">数据集名称</label>
+            <input v-model="csvDatasetName" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="留空则自动命名">
+          </div>
+        </div>
         <div v-if="importPreview" class="bg-gray-50 rounded-lg p-3">
-          <p class="text-sm text-gray-600">{{ importPreview }}</p>
+          <p class="text-sm text-gray-600" style="white-space:pre-line">{{ importPreview }}</p>
         </div>
         <div v-if="importError" class="bg-red-50 text-red-600 text-sm rounded-lg p-3">{{ importError }}</div>
       </div>
@@ -1196,7 +1207,7 @@ function getDefaultParams(taskType) {
   switch(taskType) {
     case 't2i': return { ...base, prompt: '', negativePrompt: '', steps: 30, cfgScale: 7.5, style: '', referenceImages: [] };
     case 't2v': return { ...base, prompt: '', duration: 5, fps: 24, motionType: '' };
-    case 'i2v': return { ...base, firstFrameUrl: '', firstFramePrompt: '', lastFrameUrl: '', lastFramePrompt: '', intent: '', duration: 5 };
+    case 'i2v': return { ...base, firstFrameUrl: '', lastFrameUrl: '', prompt: '', duration: 5 };
     case 'i2i': return { ...base, prompt: '', negativePrompt: '', inputImageUrl: '', strength: 0.7, controlnetType: '' };
     case 'perler_beads': return { inputImageUrl: '', prompt: '', palette: '', size: '', style: '' };
     case 'i2lora': return { styleDescription: '', trainingImages: [''], testPrompts: [''] };
@@ -1213,20 +1224,20 @@ function migrateTaskPrompts(task) {
     if (p.prompt === undefined) p.prompt = p.promptEn || p.promptZh || '';
     delete p.promptEn; delete p.promptZh;
   }
-  // firstFramePromptEn/Zh → firstFramePrompt
+  // firstFramePromptEn/Zh/firstFramePrompt → discard (image is just context)
   if (p.firstFramePromptEn !== undefined || p.firstFramePromptZh !== undefined) {
-    if (p.firstFramePrompt === undefined) p.firstFramePrompt = p.firstFramePromptEn || p.firstFramePromptZh || '';
     delete p.firstFramePromptEn; delete p.firstFramePromptZh;
   }
-  // lastFramePromptEn/Zh → lastFramePrompt
+  delete p.firstFramePrompt;
+  // lastFramePromptEn/Zh/lastFramePrompt → discard
   if (p.lastFramePromptEn !== undefined || p.lastFramePromptZh !== undefined) {
-    if (p.lastFramePrompt === undefined) p.lastFramePrompt = p.lastFramePromptEn || p.lastFramePromptZh || '';
     delete p.lastFramePromptEn; delete p.lastFramePromptZh;
   }
-  // initialPrompt + intentCn → intent
-  if (p.initialPrompt !== undefined || p.intentCn !== undefined) {
-    if (p.intent === undefined) p.intent = p.initialPrompt || p.intentCn || '';
-    delete p.initialPrompt; delete p.intentCn;
+  delete p.lastFramePrompt;
+  // initialPrompt + intentCn + intent → prompt
+  if (p.initialPrompt !== undefined || p.intentCn !== undefined || p.intent !== undefined) {
+    if (p.prompt === undefined) p.prompt = p.intent || p.initialPrompt || p.intentCn || '';
+    delete p.initialPrompt; delete p.intentCn; delete p.intent;
   }
   return task;
 }
@@ -1276,6 +1287,8 @@ const app = createApp({
     const importFormat = ref('auto');
     const importPreview = ref('');
     const importError = ref('');
+    const csvTaskType = ref('');
+    const csvDatasetName = ref('');
     const exportFormat = ref('csv');
     const exportScope = ref('current');
 
@@ -1762,7 +1775,7 @@ const app = createApp({
 
     function getTaskPromptPreview(task) {
       const p = task.params;
-      return p.intent || p.prompt || p.firstFramePrompt || p.styleDescription || task.evalId;
+      return p.prompt || p.styleDescription || task.evalId;
     }
 
     function getDetailMediaList() {
@@ -1792,22 +1805,152 @@ const app = createApp({
     }
 
     // Import
+    // CSV Parser: handles quoted fields with commas and escaped quotes
+    function parseCSV(text) {
+      const lines = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (inQuotes) {
+          if (ch === '"') {
+            if (text[i + 1] === '"') { current += '"'; i++; }
+            else { inQuotes = false; }
+          } else { current += ch; }
+        } else {
+          if (ch === '"') { inQuotes = true; }
+          else if (ch === ',') { lines.push(current); current = ''; }
+          else if (ch === '\n' || (ch === '\r' && text[i + 1] === '\n')) {
+            lines.push(current); current = ''; lines.push(null); // null = row separator
+            if (ch === '\r') i++;
+          } else { current += ch; }
+        }
+      }
+      if (current) lines.push(current);
+      // Split by null separators into rows
+      const rows = []; let row = [];
+      for (const val of lines) {
+        if (val === null) { if (row.length) rows.push(row); row = []; }
+        else { row.push(val.trim()); }
+      }
+      if (row.length) rows.push(row);
+      if (rows.length < 2) return { headers: [], rows: [] };
+      const headers = rows[0].map(h => h.toLowerCase().trim());
+      const result = rows.slice(1).filter(r => r.some(c => c)).map(r => {
+        const obj = {};
+        headers.forEach((h, i) => { obj[h] = r[i] || ''; });
+        return obj;
+      });
+      return { headers, rows: result };
+    }
+
+    // Map CSV column names to task fields
+    const CSV_COL_MAP = {
+      'eval_id': 'evalId', 'prompt': 'params.prompt', 'negative_prompt': 'params.negativePrompt',
+      'image': 'params.firstFrameUrl', 'first_frame_url': 'params.firstFrameUrl',
+      'last_frame_url': 'params.lastFrameUrl', 'input_image_url': 'params.inputImageUrl',
+      'width': 'params.width', 'height': 'params.height', 'duration': 'params.duration',
+      'fps': 'params.fps', 'seed': 'params.seed', 'steps': 'params.steps',
+      'cfg_scale': 'params.cfgScale', 'strength': 'params.strength', 'model': 'params.model',
+      'style': 'params.style', 'motion_type': 'params.motionType', 'controlnet_type': 'params.controlnetType',
+      'notes': 'notes', 'difficulty': 'difficulty', 'custom_tags': 'customTags',
+    };
+    const CSV_NUMBER_FIELDS = new Set(['width','height','duration','fps','seed','steps','cfg_scale','strength','frame_count']);
+
+    function adaptCSVRow(row, taskType, index) {
+      const params = getDefaultParams(taskType);
+      const task = {
+        id: uid(), evalId: row['eval_id'] || `${taskType}_${String(index + 1).padStart(3, '0')}`,
+        difficulty: row['difficulty'] || 'medium',
+        tags: {}, customTags: [], params, metadata: {}, notes: '', createdAt: now(), updatedAt: now(),
+      };
+      // Custom tags
+      if (row['custom_tags']) task.customTags = row['custom_tags'].split(';').map(s => s.trim()).filter(Boolean);
+      // Tag dimensions
+      for (const key of Object.keys(row)) {
+        if (key.startsWith('tag_')) {
+          const dimId = key.slice(4);
+          const vals = row[key].split(';').map(s => s.trim()).filter(Boolean);
+          if (vals.length) task.tags[dimId] = vals;
+        }
+      }
+      // Map known columns
+      for (const [col, path] of Object.entries(CSV_COL_MAP)) {
+        if (row[col] === undefined || row[col] === '') continue;
+        if (col === 'eval_id' || col === 'difficulty' || col === 'custom_tags') continue; // already handled
+        let val = row[col];
+        if (CSV_NUMBER_FIELDS.has(col)) { const n = Number(val); if (!isNaN(n)) val = n; }
+        if (path.startsWith('params.')) {
+          params[path.slice(7)] = val;
+        } else {
+          task[path] = val;
+        }
+      }
+      // frame_count → metadata + estimate duration
+      if (row['frame_count']) {
+        const fc = Number(row['frame_count']);
+        if (!isNaN(fc)) {
+          task.metadata.frameCount = fc;
+          if (!params.duration || params.duration === 5) {
+            params.duration = Math.round(fc / (params.fps || 25) * 10) / 10;
+          }
+        }
+      }
+      // Unknown columns → metadata
+      const knownCols = new Set([...Object.keys(CSV_COL_MAP), 'task_type', 'frame_count']);
+      for (const key of Object.keys(row)) {
+        if (!knownCols.has(key) && !key.startsWith('tag_') && row[key]) {
+          task.metadata[key] = row[key];
+        }
+      }
+      return task;
+    }
+
     function handleFileImport(e) {
       const file = e.target.files[0];
       if (!file) return;
       const reader = new FileReader();
       reader.onload = (ev) => {
         importJsonText.value = ev.target.result;
-        detectImportFormat();
+        // Auto-detect CSV vs JSON by file extension
+        if (file.name.endsWith('.csv')) {
+          importFormat.value = 'csv';
+          detectCSVPreview();
+        } else {
+          detectImportFormat();
+        }
       };
       reader.readAsText(file);
+    }
+
+    function detectCSVPreview() {
+      importError.value = '';
+      importPreview.value = '';
+      try {
+        const { headers, rows } = parseCSV(importJsonText.value);
+        if (!rows.length) { importError.value = 'CSV 为空或格式错误'; return; }
+        // Check if it's a platform export CSV
+        if (headers.includes('eval_id') && headers.includes('task_type')) {
+          importPreview.value = `平台导出 CSV: ${rows.length} 行\n列: ${headers.join(', ')}`;
+        } else {
+          importPreview.value = `外部 CSV: ${rows.length} 行\n列: ${headers.join(', ')}`;
+          if (!csvTaskType.value) csvTaskType.value = '';
+        }
+      } catch (e) { importError.value = 'CSV 解析失败: ' + e.message; }
     }
 
     function detectImportFormat() {
       importError.value = '';
       importPreview.value = '';
+      const txt = importJsonText.value.trim();
+      // Detect CSV format (starts with header line containing commas, no { or [)
+      if (importMode.value === 'paste_csv' || (txt && !txt.startsWith('{') && !txt.startsWith('[') && txt.includes(','))) {
+        importFormat.value = 'csv';
+        detectCSVPreview();
+        return;
+      }
       try {
-        const data = JSON.parse(importJsonText.value);
+        const data = JSON.parse(txt);
         if (data.version && data.datasets) {
           importFormat.value = 'platform';
           importPreview.value = `平台格式: ${data.datasets.length} 个数据集`;
@@ -1824,52 +1967,95 @@ const app = createApp({
           }
         }
       } catch (e) {
-        importError.value = 'JSON 解析失败: ' + e.message;
+        importError.value = '解析失败: ' + e.message;
       }
     }
 
     function executeImport() {
       importError.value = '';
       try {
-        const data = JSON.parse(importJsonText.value);
-        const format = importFormat.value === 'auto' ? detectFormat(data) : importFormat.value;
+        const format = importFormat.value;
 
-        if (format === 'platform') {
-          const imported = data.datasets || [];
-          imported.forEach(ds => {
-            ds.id = uid();
-            ds.tasks.forEach(t => { t.id = uid(); migrateTaskToV1_1(t); migrateTaskPrompts(t); });
-          });
-          // Merge tagConfig if present in import
-          if (data.tagConfig && data.tagConfig.dimensions) {
-            const existingIds = new Set(tagConfig.value.dimensions.map(d => d.id));
-            data.tagConfig.dimensions.forEach(dim => {
-              if (!existingIds.has(dim.id)) tagConfig.value.dimensions.push(dim);
+        if (format === 'csv') {
+          // CSV import
+          const { headers, rows } = parseCSV(importJsonText.value);
+          if (!rows.length) { importError.value = 'CSV 为空'; return; }
+          const isPlatformCSV = headers.includes('eval_id') && headers.includes('task_type');
+          if (isPlatformCSV) {
+            // Platform export CSV: group by task_type, create multiple datasets
+            const groups = {};
+            rows.forEach(r => {
+              const tt = r['task_type'] || 'unknown';
+              if (!groups[tt]) groups[tt] = [];
+              groups[tt].push(r);
             });
+            let total = 0;
+            for (const [tt, groupRows] of Object.entries(groups)) {
+              const ds = {
+                id: uid(), name: `CSV导入-${TASK_TYPE_LABELS[tt] || tt}`, description: '从平台 CSV 导入',
+                taskType: tt, tasks: groupRows.map((r, i) => adaptCSVRow(r, tt, i)),
+                metadata: {}, createdAt: now(), updatedAt: now(),
+              };
+              datasets.value.push(ds);
+              activeDatasetId.value = ds.id;
+              total += groupRows.length;
+            }
+            toast(`已导入 ${total} 条任务（${Object.keys(groups).length} 个数据集）`);
+          } else {
+            // External batch CSV: user must select task type
+            if (!csvTaskType.value) { importError.value = '请选择任务类型'; return; }
+            const tt = csvTaskType.value;
+            const dsName = csvDatasetName.value || `CSV导入-${TASK_TYPE_LABELS[tt] || tt}`;
+            const ds = {
+              id: uid(), name: dsName, description: '从外部 CSV 批量导入',
+              taskType: tt, tasks: rows.map((r, i) => adaptCSVRow(r, tt, i)),
+              metadata: { csvHeaders: headers }, createdAt: now(), updatedAt: now(),
+            };
+            datasets.value.push(ds);
+            activeDatasetId.value = ds.id;
+            toast(`已导入 ${rows.length} 条 ${TASK_TYPE_LABELS[tt]} 任务`);
           }
-          datasets.value.push(...imported);
-          toast(`已导入 ${imported.length} 个数据集`);
-        } else if (format === 'i2v_legacy') {
-          const arr = data.tasks || data;
-          const ds = {
-            id: uid(), name: '导入-I2V数据集', description: '从 legacy JSON 导入', taskType: 'i2v',
-            tasks: arr.map(t => adaptI2VLegacy(t)), metadata: {}, createdAt: now(), updatedAt: now(),
-          };
-          datasets.value.push(ds);
-          activeDatasetId.value = ds.id;
-          toast(`已导入 ${arr.length} 条 I2V 任务`);
-        } else if (format === 'i2lora_legacy') {
-          const arr = Array.isArray(data) ? data : [data];
-          const ds = {
-            id: uid(), name: '导入-I2LoRA数据集', description: '从 legacy JSON 导入', taskType: 'i2lora',
-            tasks: arr.map(t => adaptI2LoRALegacy(t)), metadata: {}, createdAt: now(), updatedAt: now(),
-          };
-          datasets.value.push(ds);
-          activeDatasetId.value = ds.id;
-          toast(`已导入 ${arr.length} 条 I2LoRA 任务`);
         } else {
-          importError.value = '无法识别数据格式';
-          return;
+          // JSON import
+          const data = JSON.parse(importJsonText.value);
+          const jsonFormat = format === 'auto' ? detectFormat(data) : format;
+
+          if (jsonFormat === 'platform') {
+            const imported = data.datasets || [];
+            imported.forEach(ds => {
+              ds.id = uid();
+              ds.tasks.forEach(t => { t.id = uid(); migrateTaskToV1_1(t); migrateTaskPrompts(t); });
+            });
+            if (data.tagConfig && data.tagConfig.dimensions) {
+              const existingIds = new Set(tagConfig.value.dimensions.map(d => d.id));
+              data.tagConfig.dimensions.forEach(dim => {
+                if (!existingIds.has(dim.id)) tagConfig.value.dimensions.push(dim);
+              });
+            }
+            datasets.value.push(...imported);
+            toast(`已导入 ${imported.length} 个数据集`);
+          } else if (jsonFormat === 'i2v_legacy') {
+            const arr = data.tasks || data;
+            const ds = {
+              id: uid(), name: '导入-I2V数据集', description: '从 legacy JSON 导入', taskType: 'i2v',
+              tasks: arr.map(t => adaptI2VLegacy(t)), metadata: {}, createdAt: now(), updatedAt: now(),
+            };
+            datasets.value.push(ds);
+            activeDatasetId.value = ds.id;
+            toast(`已导入 ${arr.length} 条 I2V 任务`);
+          } else if (jsonFormat === 'i2lora_legacy') {
+            const arr = Array.isArray(data) ? data : [data];
+            const ds = {
+              id: uid(), name: '导入-I2LoRA数据集', description: '从 legacy JSON 导入', taskType: 'i2lora',
+              tasks: arr.map(t => adaptI2LoRALegacy(t)), metadata: {}, createdAt: now(), updatedAt: now(),
+            };
+            datasets.value.push(ds);
+            activeDatasetId.value = ds.id;
+            toast(`已导入 ${arr.length} 条 I2LoRA 任务`);
+          } else {
+            importError.value = '无法识别数据格式';
+            return;
+          }
         }
         showImportModal.value = false;
         saveToStorage();
@@ -1901,9 +2087,9 @@ const app = createApp({
         },
         customTags: t.category ? [t.category] : [],
         params: {
-          firstFrameUrl: '', firstFramePrompt: t.first_frame?.en || t.first_frame?.cn || '',
-          lastFrameUrl: '', lastFramePrompt: t.last_frame?.en || t.last_frame?.cn || '',
-          intent: t.initial_prompt || t.intent_cn || '',
+          firstFrameUrl: '',
+          lastFrameUrl: '',
+          prompt: t.initial_prompt || t.intent_cn || '',
           width: 1920, height: 1080, duration: 5, seed: null, model: '',
         },
         metadata: { source: 'i2v_legacy_import', originalId: t.id },
@@ -1955,8 +2141,8 @@ const app = createApp({
       const dims = tagConfig.value.dimensions;
       const dimHeaders = dims.map(d => 'tag_' + d.id);
       const headers = ['eval_id','task_type','difficulty', ...dimHeaders, 'custom_tags',
-        'prompt','negative_prompt','first_frame_url','first_frame_prompt','last_frame_url','last_frame_prompt',
-        'intent','input_image_url','width','height','duration','fps','seed','steps','cfg_scale',
+        'prompt','negative_prompt','first_frame_url','last_frame_url','input_image_url',
+        'width','height','duration','fps','seed','steps','cfg_scale',
         'strength','model','style','motion_type','controlnet_type','notes'];
 
       const rows = tasks.map(t => {
@@ -1966,9 +2152,7 @@ const app = createApp({
           t.evalId, t._taskType, t.difficulty,
           ...tagCols, (t.customTags||[]).join(';'),
           p.prompt||'', p.negativePrompt||'',
-          p.firstFrameUrl||'', p.firstFramePrompt||'',
-          p.lastFrameUrl||'', p.lastFramePrompt||'',
-          p.intent||'', p.inputImageUrl||'',
+          p.firstFrameUrl||'', p.lastFrameUrl||'', p.inputImageUrl||'',
           p.width||'', p.height||'', p.duration||'', p.fps||'', p.seed||'', p.steps||'', p.cfgScale||'',
           p.strength||'', p.model||'', p.style||'', p.motionType||'', p.controlnetType||'', t.notes||''
         ].map(v => `"${String(v).replace(/"/g, '""')}"`);
@@ -2024,7 +2208,7 @@ const app = createApp({
       editingDataset, datasetForm, editingTask, taskForm, newCustomTag, detailTask,
       tagConfig, showTagConfigModal, tagConfigDraft, tagConfigEditDimId, inlineEditId, inlineEditLabel,
       selectedTaskIds,
-      importMode, importJsonText, importFormat, importPreview, importError,
+      importMode, importJsonText, importFormat, importPreview, importError, csvTaskType, csvDatasetName,
       exportFormat, exportScope, exportTaskCount,
       filters, confirmDialog, toasts,
       // Computed
