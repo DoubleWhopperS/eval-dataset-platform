@@ -503,12 +503,8 @@
           <template v-if="activeDataset.taskType === 't2i'">
             <div class="space-y-3">
               <div>
-                <label class="block text-xs text-gray-500 mb-1">Prompt (EN)</label>
-                <textarea v-model="taskForm.params.promptEn" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
-              </div>
-              <div>
-                <label class="block text-xs text-gray-500 mb-1">Prompt (ZH)</label>
-                <textarea v-model="taskForm.params.promptZh" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+                <label class="block text-xs text-gray-500 mb-1">Prompt</label>
+                <textarea v-model="taskForm.params.prompt" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="中英文均可"></textarea>
               </div>
               <div>
                 <label class="block text-xs text-gray-500 mb-1">Negative Prompt</label>
@@ -562,12 +558,8 @@
           <template v-if="activeDataset.taskType === 't2v'">
             <div class="space-y-3">
               <div>
-                <label class="block text-xs text-gray-500 mb-1">Prompt (EN)</label>
-                <textarea v-model="taskForm.params.promptEn" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
-              </div>
-              <div>
-                <label class="block text-xs text-gray-500 mb-1">Prompt (ZH)</label>
-                <textarea v-model="taskForm.params.promptZh" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+                <label class="block text-xs text-gray-500 mb-1">Prompt</label>
+                <textarea v-model="taskForm.params.prompt" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="中英文均可"></textarea>
               </div>
               <div class="grid grid-cols-4 gap-3">
                 <div><label class="block text-xs text-gray-500 mb-1">Width</label><input v-model.number="taskForm.params.width" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></div>
@@ -594,32 +586,20 @@
                 </div>
               </div>
               <div>
-                <label class="block text-xs text-gray-500 mb-1">首帧 Prompt (EN)</label>
-                <textarea v-model="taskForm.params.firstFramePromptEn" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
-              </div>
-              <div>
-                <label class="block text-xs text-gray-500 mb-1">首帧 Prompt (ZH)</label>
-                <textarea v-model="taskForm.params.firstFramePromptZh" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+                <label class="block text-xs text-gray-500 mb-1">首帧 Prompt</label>
+                <textarea v-model="taskForm.params.firstFramePrompt" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="中英文均可"></textarea>
               </div>
               <div>
                 <label class="block text-xs text-gray-500 mb-1">尾帧图片 (URL/路径)</label>
                 <input v-model="taskForm.params.lastFrameUrl" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
               </div>
               <div>
-                <label class="block text-xs text-gray-500 mb-1">尾帧 Prompt (EN)</label>
-                <textarea v-model="taskForm.params.lastFramePromptEn" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+                <label class="block text-xs text-gray-500 mb-1">尾帧 Prompt</label>
+                <textarea v-model="taskForm.params.lastFramePrompt" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="中英文均可"></textarea>
               </div>
               <div>
-                <label class="block text-xs text-gray-500 mb-1">尾帧 Prompt (ZH)</label>
-                <textarea v-model="taskForm.params.lastFramePromptZh" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
-              </div>
-              <div>
-                <label class="block text-xs text-gray-500 mb-1">视频意图 (Initial Prompt) *</label>
-                <textarea v-model="taskForm.params.initialPrompt" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
-              </div>
-              <div>
-                <label class="block text-xs text-gray-500 mb-1">中文意图描述 *</label>
-                <input v-model="taskForm.params.intentCn" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                <label class="block text-xs text-gray-500 mb-1">视频意图 *</label>
+                <textarea v-model="taskForm.params.intent" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="中英文均可"></textarea>
               </div>
               <div class="grid grid-cols-4 gap-3">
                 <div><label class="block text-xs text-gray-500 mb-1">Width</label><input v-model.number="taskForm.params.width" type="number" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="1920"></div>
@@ -639,12 +619,8 @@
                 <input v-model="taskForm.params.inputImageUrl" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
               </div>
               <div>
-                <label class="block text-xs text-gray-500 mb-1">Prompt (EN)</label>
-                <textarea v-model="taskForm.params.promptEn" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
-              </div>
-              <div>
-                <label class="block text-xs text-gray-500 mb-1">Prompt (ZH)</label>
-                <textarea v-model="taskForm.params.promptZh" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+                <label class="block text-xs text-gray-500 mb-1">Prompt</label>
+                <textarea v-model="taskForm.params.prompt" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="中英文均可"></textarea>
               </div>
               <div>
                 <label class="block text-xs text-gray-500 mb-1">Negative Prompt</label>
@@ -669,7 +645,7 @@
               </div>
               <div>
                 <label class="block text-xs text-gray-500 mb-1">Prompt</label>
-                <textarea v-model="taskForm.params.promptEn" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+                <textarea v-model="taskForm.params.prompt" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" placeholder="中英文均可"></textarea>
               </div>
               <div class="grid grid-cols-3 gap-3">
                 <div><label class="block text-xs text-gray-500 mb-1">Palette</label><input v-model="taskForm.params.palette" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></div>
@@ -1218,14 +1194,41 @@ function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTi
 function getDefaultParams(taskType) {
   const base = { width: 0, height: 0, seed: null, model: '' };
   switch(taskType) {
-    case 't2i': return { ...base, promptEn: '', promptZh: '', negativePrompt: '', steps: 30, cfgScale: 7.5, style: '', referenceImages: [] };
-    case 't2v': return { ...base, promptEn: '', promptZh: '', duration: 5, fps: 24, motionType: '' };
-    case 'i2v': return { ...base, firstFrameUrl: '', firstFramePromptEn: '', firstFramePromptZh: '', lastFrameUrl: '', lastFramePromptEn: '', lastFramePromptZh: '', initialPrompt: '', intentCn: '', duration: 5 };
-    case 'i2i': return { ...base, promptEn: '', promptZh: '', negativePrompt: '', inputImageUrl: '', strength: 0.7, controlnetType: '' };
-    case 'perler_beads': return { inputImageUrl: '', promptEn: '', palette: '', size: '', style: '' };
+    case 't2i': return { ...base, prompt: '', negativePrompt: '', steps: 30, cfgScale: 7.5, style: '', referenceImages: [] };
+    case 't2v': return { ...base, prompt: '', duration: 5, fps: 24, motionType: '' };
+    case 'i2v': return { ...base, firstFrameUrl: '', firstFramePrompt: '', lastFrameUrl: '', lastFramePrompt: '', intent: '', duration: 5 };
+    case 'i2i': return { ...base, prompt: '', negativePrompt: '', inputImageUrl: '', strength: 0.7, controlnetType: '' };
+    case 'perler_beads': return { inputImageUrl: '', prompt: '', palette: '', size: '', style: '' };
     case 'i2lora': return { styleDescription: '', trainingImages: [''], testPrompts: [''] };
     default: return base;
   }
+}
+
+// Migrate bilingual prompt fields to single-field format
+function migrateTaskPrompts(task) {
+  const p = task.params;
+  if (!p) return task;
+  // promptEn/promptZh → prompt
+  if (p.promptEn !== undefined || p.promptZh !== undefined) {
+    if (p.prompt === undefined) p.prompt = p.promptEn || p.promptZh || '';
+    delete p.promptEn; delete p.promptZh;
+  }
+  // firstFramePromptEn/Zh → firstFramePrompt
+  if (p.firstFramePromptEn !== undefined || p.firstFramePromptZh !== undefined) {
+    if (p.firstFramePrompt === undefined) p.firstFramePrompt = p.firstFramePromptEn || p.firstFramePromptZh || '';
+    delete p.firstFramePromptEn; delete p.firstFramePromptZh;
+  }
+  // lastFramePromptEn/Zh → lastFramePrompt
+  if (p.lastFramePromptEn !== undefined || p.lastFramePromptZh !== undefined) {
+    if (p.lastFramePrompt === undefined) p.lastFramePrompt = p.lastFramePromptEn || p.lastFramePromptZh || '';
+    delete p.lastFramePromptEn; delete p.lastFramePromptZh;
+  }
+  // initialPrompt + intentCn → intent
+  if (p.initialPrompt !== undefined || p.intentCn !== undefined) {
+    if (p.intent === undefined) p.intent = p.initialPrompt || p.intentCn || '';
+    delete p.initialPrompt; delete p.intentCn;
+  }
+  return task;
 }
 
 // ==================== APP ====================
@@ -1427,13 +1430,25 @@ const app = createApp({
           }
           // Load datasets
           datasets.value = data.datasets || [];
-          // Migrate v1.0 tasks if needed
+          // Migrate tasks if needed
+          let needsSave = false;
           if (!data.version || data.version === '1.0') {
             datasets.value.forEach(ds => {
               ds.tasks.forEach(t => migrateTaskToV1_1(t));
             });
-            saveToStorage(); // Persist migration
+            needsSave = true;
           }
+          // Migrate bilingual prompts to single-field
+          datasets.value.forEach(ds => {
+            ds.tasks.forEach(t => {
+              const p = t.params;
+              if (p && (p.promptEn !== undefined || p.firstFramePromptEn !== undefined || p.initialPrompt !== undefined)) {
+                migrateTaskPrompts(t);
+                needsSave = true;
+              }
+            });
+          });
+          if (needsSave) saveToStorage();
           if (datasets.value.length) activeDatasetId.value = datasets.value[0].id;
           lastSaved.value = Date.now();
         }
@@ -1747,7 +1762,7 @@ const app = createApp({
 
     function getTaskPromptPreview(task) {
       const p = task.params;
-      return p.initialPrompt || p.intentCn || p.promptEn || p.promptZh || p.styleDescription || task.evalId;
+      return p.intent || p.prompt || p.firstFramePrompt || p.styleDescription || task.evalId;
     }
 
     function getDetailMediaList() {
@@ -1823,7 +1838,7 @@ const app = createApp({
           const imported = data.datasets || [];
           imported.forEach(ds => {
             ds.id = uid();
-            ds.tasks.forEach(t => { t.id = uid(); migrateTaskToV1_1(t); });
+            ds.tasks.forEach(t => { t.id = uid(); migrateTaskToV1_1(t); migrateTaskPrompts(t); });
           });
           // Merge tagConfig if present in import
           if (data.tagConfig && data.tagConfig.dimensions) {
@@ -1886,9 +1901,9 @@ const app = createApp({
         },
         customTags: t.category ? [t.category] : [],
         params: {
-          firstFrameUrl: '', firstFramePromptEn: t.first_frame?.en || '', firstFramePromptZh: t.first_frame?.cn || '',
-          lastFrameUrl: '', lastFramePromptEn: t.last_frame?.en || '', lastFramePromptZh: t.last_frame?.cn || '',
-          initialPrompt: t.initial_prompt || '', intentCn: t.intent_cn || '',
+          firstFrameUrl: '', firstFramePrompt: t.first_frame?.en || t.first_frame?.cn || '',
+          lastFrameUrl: '', lastFramePrompt: t.last_frame?.en || t.last_frame?.cn || '',
+          intent: t.initial_prompt || t.intent_cn || '',
           width: 1920, height: 1080, duration: 5, seed: null, model: '',
         },
         metadata: { source: 'i2v_legacy_import', originalId: t.id },
@@ -1940,8 +1955,8 @@ const app = createApp({
       const dims = tagConfig.value.dimensions;
       const dimHeaders = dims.map(d => 'tag_' + d.id);
       const headers = ['eval_id','task_type','difficulty', ...dimHeaders, 'custom_tags',
-        'prompt_en','prompt_zh','negative_prompt','first_frame_url','last_frame_url','input_image_url',
-        'initial_prompt','intent_cn','width','height','duration','fps','seed','steps','cfg_scale',
+        'prompt','negative_prompt','first_frame_url','first_frame_prompt','last_frame_url','last_frame_prompt',
+        'intent','input_image_url','width','height','duration','fps','seed','steps','cfg_scale',
         'strength','model','style','motion_type','controlnet_type','notes'];
 
       const rows = tasks.map(t => {
@@ -1950,9 +1965,10 @@ const app = createApp({
         return [
           t.evalId, t._taskType, t.difficulty,
           ...tagCols, (t.customTags||[]).join(';'),
-          p.promptEn||p.firstFramePromptEn||'', p.promptZh||p.firstFramePromptZh||'', p.negativePrompt||'',
-          p.firstFrameUrl||'', p.lastFrameUrl||'', p.inputImageUrl||'',
-          p.initialPrompt||'', p.intentCn||'',
+          p.prompt||'', p.negativePrompt||'',
+          p.firstFrameUrl||'', p.firstFramePrompt||'',
+          p.lastFrameUrl||'', p.lastFramePrompt||'',
+          p.intent||'', p.inputImageUrl||'',
           p.width||'', p.height||'', p.duration||'', p.fps||'', p.seed||'', p.steps||'', p.cfgScale||'',
           p.strength||'', p.model||'', p.style||'', p.motionType||'', p.controlnetType||'', t.notes||''
         ].map(v => `"${String(v).replace(/"/g, '""')}"`);
